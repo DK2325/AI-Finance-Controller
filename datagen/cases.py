@@ -20,6 +20,7 @@ import random
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 
+from datagen.customers import CUSTOMERS
 from datagen.narration import format_date, make_bank_ref, make_narration
 from datagen.schemas import (
     BANKS,
@@ -32,25 +33,6 @@ from datagen.schemas import (
     pct_of,
     rupees,
 )
-
-CUSTOMERS = [
-    "ACME RETAIL PRIVATE LIMITED",
-    "BHARAT LOGISTICS PVT LTD",
-    "CHENNAI TEXTILES LIMITED",
-    "DECCAN AGRO EXPORTS PVT LTD",
-    "EASTERN MOTORS PRIVATE LIMITED",
-    "FIRSTLIGHT MEDIA LLP",
-    "GANGA PHARMACEUTICALS LTD",
-    "HIMALAYA FOODS PRIVATE LIMITED",
-    "INDUS SOFTWARE SERVICES PVT LTD",
-    "JAIPUR HANDICRAFTS LLP",
-    "KAVERI ENGINEERING PVT LTD",
-    "LOTUS HOSPITALITY LIMITED",
-    "MARUTI TRADERS PRIVATE LIMITED",
-    "NARMADA CHEMICALS PVT LTD",
-    "ORION ELECTRICALS LIMITED",
-    "PRAGATI CONSTRUCTIONS LLP",
-]
 
 BASE_DATE = date(2026, 6, 1)
 DATE_SPAN_DAYS = 90

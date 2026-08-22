@@ -1,0 +1,14 @@
+{
+  "sealed": true,
+  "sealed_at_phase": 1,
+  "seed": 7,
+  "sha256": {
+    "bank_statement.csv": "558de0ca06c27df92db49784f4068ae231e97ff387266c0fbb77d96c80b80305",
+    "gateway_settlements.csv": "d9e8d2f601684cc66c5bd41328a40ca9855b20d4bc22a2b502efc123930c84c2",
+    "invoice_ledger.csv": "0e97088f56780e53a585ec6f4acca8926e433d3a47385913edaaefd7233bab50",
+    "manifest.json": "35ce44d28f6ad23dcb006d600179627b480144813d6ac2ba0ed1b870a8faee62",
+    "truth.csv": "cd1326d24f0e03c929ca856bc40b8be160806335a932ba50de06900c67f0f8f0"
+  },
+  "unseal_at_phase": 7,
+  "why": "The held-out test set. Reading it before Phase 7 invalidates every number in the submission, because any tuning done with knowledge of it is no longer an honest out-of-sample result. tests/test_seal.py enforces this."
+}

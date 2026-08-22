@@ -66,3 +66,36 @@ there. `tests/test_generator.py` asserts every type is within 1% of target, that
 relative proportions survive renormalisation, and that the held-out types leave no trace
 in the training batch — not in `truth.csv`, not as a TDS-flagged invoice, and not as a
 `type=refund` recon row.
+
+---
+
+## Counterparty pool: 16 names -> 2,000 (23 Aug 2026)
+
+The first generator drew counterparties from a hardcoded list of 16 companies. That was
+wrong in a way that would only have surfaced in Phase 7, as an unattributable train/test
+gap.
+
+**Why it mattered.** Counterparty historical match frequency is a planned Phase 3 feature
+and a Phase 4 model input. With 16 names every counterparty recurs hundreds of times in a
+5,000-row batch, so that feature carried far more signal than it ever could against a real
+merchant's ledger. Blocking recall was inflated for the same reason: bucketing by
+normalised counterparty token barely narrowed the candidate set when there were only 16
+possible values, which would have made Phase 3's blocking look more effective than it is.
+
+Had this survived to Phase 7, the honest answer to *"was that feature strong because of
+your data?"* would have been *"probably, and I can't separate it out now."*
+
+**What changed.** `datagen/customers.py` builds a 2,000-name pool as a deterministic
+product over 52 Indian places and 40 sector words, with corporate suffixes assigned by
+index. Nothing in the pool consumes the seeded `Random`, so it is a constant: two callers
+get identical lists regardless of what else has drawn from the generator.
+
+All three batches were regenerated. The case-type distribution is unaffected — the pool
+changes *who* transacts, not *what happens* — and every distribution assertion still
+holds.
+
+**Still flagged, deliberately not fixed:** invoice amounts remain uniform over
+Rs 1,000-5,00,000 where real B2B values are log-normal with round-number clustering. This
+makes amount-band blocking slightly easier than reality. Recorded in
+`notes/failure-modes.md` rather than fixed, because unlike the counterparty pool it does
+not feed a named model feature.

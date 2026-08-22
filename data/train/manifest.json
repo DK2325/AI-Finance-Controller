@@ -27,7 +27,7 @@
   },
   "topped_up_clean_rows": 1,
   "totals": {
-    "bank_rows": 4536,
+    "bank_rows": 4531,
     "gateway_rows": 4945,
     "invoices": 4945,
     "truth_rows": 5000
