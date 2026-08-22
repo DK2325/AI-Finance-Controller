@@ -29,14 +29,36 @@ _NOT_YET = "[phase {phase}] not implemented yet - Phase 0 registers this command
 
 @app.command()
 def generate(
-    rows: int = typer.Option(1000, "--rows", help="Number of invoice rows to synthesise."),
+    rows: int = typer.Option(1000, "--rows", help="Number of truth rows to synthesise."),
     seed: int = typer.Option(42, "--seed", help="Deterministic seed. Same seed, same bytes."),
     difficulty: Difficulty = typer.Option(Difficulty.hard, "--difficulty"),
     out: Path = typer.Option(..., "--out", help="Output directory for the batch."),
+    exclude_cases: str = typer.Option(
+        "",
+        "--exclude-cases",
+        help="Comma-separated case types to omit, e.g. tds_deducted,refund_netted. "
+        "Used to build the training batch without the held-out types.",
+    ),
 ) -> None:
     """Synthesise a batch plus its ground-truth answer key."""
-    typer.echo(_NOT_YET.format(phase=1))
-    typer.echo(f"  would write {rows} rows (seed={seed}, difficulty={difficulty.value}) to {out}")
+    from datagen.generator import generate_to
+
+    exclude = tuple(c.strip() for c in exclude_cases.split(",") if c.strip())
+
+    try:
+        manifest = generate_to(out_dir=out, rows=rows, seed=seed, exclude=exclude)
+    except ValueError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    totals = manifest["totals"]
+    typer.echo(f"wrote {out}  (seed={seed}, difficulty={difficulty.value})")
+    typer.echo(
+        f"  {totals['invoices']} invoices, {totals['gateway_rows']} gateway rows, "
+        f"{totals['bank_rows']} bank rows, {totals['truth_rows']} truth rows"
+    )
+    if exclude:
+        typer.echo(f"  excluded: {', '.join(exclude)}")
 
 
 @app.command()

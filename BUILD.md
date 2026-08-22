@@ -260,12 +260,27 @@ actually produce, not a shape you invented.
 
 ### Data contracts
 
-**gateway_settlements.csv** — Razorpay settlement report shape:
-`settlement_id, utr, payment_id, order_id, gross_amount, fee, gst_on_fee,
-net_amount, settled_on, merchant_ref`
+> **Superseded, 22 Aug 2026.** The contract originally written here was illustrative and
+> used field names Razorpay does not publish. This section now records the real names,
+> per this phase's own exit criterion ("column names match the real Razorpay/bank
+> formats"). Full field-by-field mapping, units, and source URLs are in
+> `notes/schemas.md`; the single definition used by code is `datagen/schemas.py`.
 
-**bank_statement.csv**:
-`txn_id, value_date, narration, debit, credit, balance, bank_ref`
+**gateway_settlements.csv** — Razorpay Settlement Recon report shape.
+**Money is integer paise, as Razorpay itself reports it.** Timestamps are unix ints:
+`entity_id, type, payment_id, order_id, order_receipt, settlement_id, settlement_utr,
+amount, fee, tax, debit, credit, net_amount, currency, method, created_at, settled_at`
+
+- `type` is `payment | refund | transfer | adjustment`. It is load-bearing: a refund is
+  its own row carrying a debit, which is how `refund_netted` manifests in real reports.
+- `tax` is GST charged on `fee`.
+- `net_amount` is **not** a Razorpay field. It is a derived convenience column,
+  `amount - fee - tax` for payments and `-amount` for refunds.
+
+**bank_statement.csv** — one normalised file whose rows are drawn from two real dialects
+(HDFC and ICICI), marked by `bank`. The dialects differ in narration grammar and date
+convention, not merely in column headers:
+`txn_id, value_date, narration, debit, credit, balance, bank_ref, bank`
 
 **invoice_ledger.csv**:
 `invoice_id, customer_name, invoice_date, due_date, amount, tds_applicable,

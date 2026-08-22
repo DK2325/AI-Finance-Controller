@@ -1,0 +1,36 @@
+{
+  "actual_counts": {
+    "batched_settlement": 60,
+    "clean": 275,
+    "date_skew": 15,
+    "duplicate_utr": 10,
+    "fee_deducted": 50,
+    "orphan": 5,
+    "partial_payment": 30,
+    "refund_netted": 20,
+    "rounding_drift": 10,
+    "tds_deducted": 25
+  },
+  "excluded_cases": [],
+  "rows_requested": 500,
+  "seed": 99,
+  "target_counts": {
+    "batched_settlement": 60,
+    "clean": 275,
+    "date_skew": 15,
+    "duplicate_utr": 10,
+    "fee_deducted": 50,
+    "orphan": 5,
+    "partial_payment": 30,
+    "refund_netted": 20,
+    "rounding_drift": 10,
+    "tds_deducted": 25
+  },
+  "topped_up_clean_rows": 0,
+  "totals": {
+    "bank_rows": 455,
+    "gateway_rows": 515,
+    "invoices": 495,
+    "truth_rows": 500
+  }
+}
