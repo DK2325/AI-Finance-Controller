@@ -1,7 +1,7 @@
 {
   "actual_counts": {
-    "batched_settlement": 600,
-    "clean": 2750,
+    "batched_settlement": 599,
+    "clean": 2751,
     "date_skew": 150,
     "duplicate_utr": 100,
     "fee_deducted": 500,
@@ -26,9 +26,9 @@
     "rounding_drift": 100,
     "tds_deducted": 250
   },
-  "topped_up_clean_rows": 0,
+  "topped_up_clean_rows": 1,
   "totals": {
-    "bank_rows": 4576,
+    "bank_rows": 4569,
     "gateway_rows": 5150,
     "invoices": 4950,
     "truth_rows": 5000
