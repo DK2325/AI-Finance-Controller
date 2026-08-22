@@ -144,3 +144,34 @@ the audit record. `--mock-llm` still carries Phases 1-4.
     synthetic, by construction. The isolation boundary means the demo never has real
     merchant data to leak. This must stay true - never point this pipeline at a real
     settlement file.
+
+### Measured: NVIDIA NIM connectivity and reasoning behaviour (23 Aug 2026)
+
+The key is configured and a live call succeeds. Two things measured before Phase 5 plans
+around them, both of which were open questions in the pre-decision above.
+
+**Reasoning does not contaminate the payload.** Constraint 3 worried that the parser might
+mistake thinking text for the answer. It cannot: the reasoning trace arrives in a separate
+`reasoning_content` field on the message, and `content` holds only the requested output.
+
+| | latency | output tokens | `reasoning_content` | `content` |
+|---|---|---|---|---|
+| `enable_thinking: True` | 4.96s | 54 | 172 chars | `{"status":"ok","n":7}` |
+| `enable_thinking: False` | 1.54s | 10 | empty | `{"status":"ok","n":7}` |
+
+Identical payload either way, on a structured-extraction task.
+
+*A trap worth recording:* the first probe used `max_tokens=32` and got back a `content`
+full of reasoning prose. That was truncation, not contamination -- the model was cut off
+mid-reasoning before it emitted the payload. A too-small token budget on a reasoning model
+does not produce a short answer, it produces **reasoning as the answer**. Phase 5 must set
+a budget generous enough for the reasoning trace plus the payload, or disable thinking.
+
+**Thinking costs 5.4x the output tokens and 3.2x the latency here** for no change in
+output. Since the residue is thousands of calls on a rate-limited free endpoint, the
+default for the three Phase 5 jobs should be thinking OFF, enabled only where a measured
+schema-validation failure rate justifies it. That is a measurement to make in Phase 5, not
+an assumption to carry in.
+
+The client is the `openai` SDK against `https://integrate.api.nvidia.com/v1`, now a
+declared dependency.

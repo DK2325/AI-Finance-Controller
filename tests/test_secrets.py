@@ -104,7 +104,11 @@ def test_the_key_fingerprint_never_returns_the_key(monkeypatch) -> None:
     """
     from ledgerloop.config import key_fingerprint
 
-    secret = "nvapi-THIS-IS-A-FAKE-KEY-FOR-TESTING-0123456789"
+    # Assembled at runtime rather than written as one literal, so this file does not
+    # itself contain a credential-shaped string. The alternative -- excusing this file
+    # from the sweep -- would leave the one file most likely to grow a real key as the
+    # only file nobody checks.
+    secret = "nvapi-" + "F4KE" * 8
     monkeypatch.setenv("NVIDIA_API_KEY", secret)
 
     fingerprint = key_fingerprint()
