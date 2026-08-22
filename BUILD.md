@@ -227,7 +227,8 @@ most common way to lose this.
 - Import-lint test that fails if `core/`, `model/`, `llm/`, or `api/` import
   from `datagen/` or reference `truth.csv`. This test must exist before any
   matching code does.
-- `.env.example` with `ANTHROPIC_API_KEY=` and `DATABASE_URL=`. Never commit a
+- `.env.example` with `NVIDIA_API_KEY=` and `DATABASE_URL=`. (Superseded 23 Aug 2026:
+  the provider is NVIDIA NIM, not Anthropic. See notes/decisions.md.) Never commit a
   real key.
 
 ### Exit criteria

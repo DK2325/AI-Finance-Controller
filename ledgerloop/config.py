@@ -16,11 +16,6 @@ def database_url() -> str:
     return os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
 
 
-def anthropic_api_key() -> str | None:
-    """Kept for reference; the project uses NVIDIA NIM. See notes/decisions.md."""
-    return os.environ.get("ANTHROPIC_API_KEY") or None
-
-
 # NVIDIA NIM, OpenAI-compatible. See notes/decisions.md for why this provider.
 DEFAULT_NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 DEFAULT_NVIDIA_MODEL = "nvidia/nemotron-3-super-120b-a12b"

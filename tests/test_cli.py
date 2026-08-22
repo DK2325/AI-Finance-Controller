@@ -36,7 +36,6 @@ def test_generate_accepts_its_documented_flags(tmp_path) -> None:
 
 def test_recon_accepts_mock_llm_without_an_api_key(monkeypatch) -> None:
     """No API key exists until Phase 5. --mock-llm must run the full pipeline without one."""
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
 
     result = runner.invoke(

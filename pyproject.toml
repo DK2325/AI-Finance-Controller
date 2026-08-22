@@ -26,7 +26,6 @@ dependencies = [
     "alembic>=1.13",
     "psycopg[binary]>=3.2",
     "openai>=1.40",
-    "anthropic>=0.40",
     "python-dotenv>=1.0",
 ]
 

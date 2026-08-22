@@ -34,7 +34,6 @@ psycopg[binary]>=3.2
 # llm (unused until Phase 5; --mock-llm works without a key)
 # NVIDIA NIM is OpenAI-compatible, so the openai SDK is the client. See notes/decisions.md.
 openai>=1.40
-anthropic>=0.40
 
 # config
 python-dotenv>=1.0
