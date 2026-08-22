@@ -65,7 +65,7 @@ regression floor, not a result. Any real matcher must beat it.
 
 ### Risk-coverage curve
 
-![Risk-coverage curve](notes/risk-coverage-baseline.png)
+![Risk-coverage curve](notes/runs/baseline/chart.png)
 
 The headline artifact: precision as a function of how much the system chooses to decide.
 

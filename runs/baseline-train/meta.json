@@ -1,7 +1,0 @@
-{
-  "batch_dir": "data/train",
-  "kind": "baseline",
-  "layer": "baseline_exact_utr",
-  "n_predictions": 2557,
-  "run_id": "baseline-train"
-}

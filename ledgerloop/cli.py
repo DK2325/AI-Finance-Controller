@@ -70,10 +70,50 @@ def recon(
     threshold: float | None = typer.Option(
         None, "--threshold", help="Operating point. Defaults to the selected point."
     ),
+    run: str = typer.Option("", "--run", help="Run id to write. Defaults to recon-<batch>."),
 ) -> None:
     """Reconcile a batch: deterministic, then fuzzy, then learned, then LLM on the residue."""
-    typer.echo(_NOT_YET.format(phase=3))
-    typer.echo(f"  would reconcile {in_dir} (mock_llm={mock_llm}, threshold={threshold})")
+    from core.pipeline import reconcile
+    from evals.models import Prediction, Run, Triple
+    from evals.runs import FilesystemRunStore
+
+    result = reconcile(in_dir)
+
+    predictions = [
+        Prediction(
+            triple=Triple(m.invoice_id, m.settlement_id, m.txn_id),
+            confidence=m.score,
+            layer=m.layer,
+        )
+        for m in result.matches
+        if threshold is None or m.score >= threshold
+    ]
+
+    run_id = run or f"recon-{Path(in_dir).name}"
+    meta = result.meta()
+    meta["mock_llm"] = mock_llm
+    FilesystemRunStore().save(
+        Run(run_id=run_id, batch_dir=str(in_dir).replace("\\", "/"),
+            predictions=predictions, meta=meta)
+    )
+
+    t = meta["timing"]
+    typer.echo(f"reconciled {in_dir} -> run '{run_id}'")
+    typer.echo(f"  {len(result.matches)} matches, {len(result.exceptions)} exceptions")
+    typer.echo(f"  {t['rows']} rows in {t['seconds_total']}s ({t['rows_per_second']:,.0f} rows/s)")
+    for stage, seconds in t["seconds_by_stage"].items():
+        typer.echo(f"      {stage:12} {seconds:7.3f}s")
+    typer.echo("  candidates per blocking pass:")
+    for name, count in result.blocking["per_pass"].items():
+        typer.echo(f"      {name:16} {count:8,}")
+    typer.echo(f"      {'unique':16} {result.blocking['unique_candidates']:8,}")
+    ss = result.subset_sum
+    typer.echo(
+        f"  subset-sum: {ss['buckets_searched']} searched, {ss['buckets_skipped']} capped"
+        f" ({ss['cap_hit_rate']:.2%}), {ss['subsets_found']} found"
+    )
+    typer.echo("")
+    typer.echo("  NOTE: rule scores are ranked tiers, not calibrated probabilities.")
 
 
 @app.command(name="eval")

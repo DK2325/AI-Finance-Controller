@@ -9,3 +9,12 @@ __pycache__/
 node_modules/
 .next/
 *.log
+
+# Working run artifacts. Regenerable, and predictions.jsonl is large and churny.
+# The three canonical runs live in notes/runs/ as curve.json + report.json + chart.png:
+#   baseline    Phase 2 regression floor
+#   v1          Phase 4 calibrated model
+#   sealed-test Phase 7
+# Leading slash anchors this to the repo root -- a bare "runs/" would also match
+# notes/runs/, silently excluding the committed canonical artifacts.
+/runs/

@@ -34,10 +34,24 @@ def test_generate_accepts_its_documented_flags(tmp_path) -> None:
     assert result.exit_code == 0
 
 
-def test_recon_accepts_mock_llm_without_an_api_key(tmp_path) -> None:
-    """No API key exists until Phase 5. --mock-llm must work from day one."""
+def test_recon_accepts_mock_llm_without_an_api_key(monkeypatch) -> None:
+    """No API key exists until Phase 5. --mock-llm must run the full pipeline without one."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
+
+    result = runner.invoke(
+        app, ["recon", "--in", "data/demo", "--mock-llm", "--run", "cli-smoke"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "matches" in result.output
+    assert "not calibrated probabilities" in result.output, (
+        "an uncalibrated run must say so on every invocation"
+    )
+
+
+def test_recon_fails_cleanly_on_a_batch_that_is_not_there(tmp_path) -> None:
     result = runner.invoke(app, ["recon", "--in", str(tmp_path), "--mock-llm"])
-    assert result.exit_code == 0
+    assert result.exit_code != 0
 
 
 def test_chaos_accepts_a_run_id() -> None:
