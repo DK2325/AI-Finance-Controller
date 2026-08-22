@@ -1,0 +1,208 @@
+{
+  "algorithm": "lightgbm.LGBMClassifier",
+  "calibration": {
+    "candidates": {
+      "isotonic": {
+        "brier": 0.006071,
+        "ece": 0.0,
+        "mce": 0.0
+      },
+      "platt": {
+        "brier": 0.007257,
+        "ece": 0.001845,
+        "mce": 0.77732
+      }
+    },
+    "chosen_on": "expected_calibration_error",
+    "margin_over_runner_up": 0.001845,
+    "method": "isotonic"
+  },
+  "case_type_prior": {
+    "exact_amount_counterparty": 0.30678,
+    "exact_amount_date": 0.16277,
+    "fee_adjusted": 0.04956,
+    "fuzzy_counterparty_date": 0.00671,
+    "none": 0.12334,
+    "utr_amount_date": 0.29911,
+    "utr_amount_tolerance": 0.00657,
+    "utr_only": 0.04517
+  },
+  "class_prior": {
+    "base_rate_all": 0.499932,
+    "base_rate_calibration": 0.514591,
+    "base_rate_evaluation": 0.477528,
+    "base_rate_fit": 0.505835,
+    "n_candidates": 7305,
+    "n_negative": 3653,
+    "n_positive": 3652,
+    "negatives_per_positive": 1.0003,
+    "note": "Trained WITHOUT tds_deducted and refund_netted. These figures describe eight case types, not ten. Phase 7 must compare against this recorded prior rather than assume the test prior.",
+    "rebalancing": "none - the candidate set is already near-balanced"
+  },
+  "excluded_cases": [
+    "tds_deducted",
+    "refund_netted"
+  ],
+  "feature_names": [
+    "amount_delta_abs",
+    "amount_delta_pct",
+    "amount_exact",
+    "amount_within_tolerance",
+    "date_delta_days",
+    "date_delta_abs",
+    "date_within_window",
+    "narration_similarity",
+    "narration_partial_similarity",
+    "utr_in_narration",
+    "utr_edit_distance",
+    "counterparty_in_narration",
+    "counterparty_match_frequency",
+    "delta_matches_fee",
+    "delta_matches_tds",
+    "delta_matches_known_rate",
+    "in_plausible_subset_sum",
+    "n_blocking_passes",
+    "credit_is_larger",
+    "invoice_receipt_given",
+    "invoice_link_score",
+    "invoice_amount_ratio",
+    "invoice_date_delta_days"
+  ],
+  "feature_schema": {
+    "constants": {
+      "fee_rate": 0.02,
+      "gst_on_fee_rate": 0.18,
+      "missing_days": 999,
+      "paise_tolerance": 5,
+      "tds_rates": [
+        0.001,
+        0.02,
+        0.05,
+        0.1
+      ]
+    },
+    "n_features": 23,
+    "names": [
+      "amount_delta_abs",
+      "amount_delta_pct",
+      "amount_exact",
+      "amount_within_tolerance",
+      "date_delta_days",
+      "date_delta_abs",
+      "date_within_window",
+      "narration_similarity",
+      "narration_partial_similarity",
+      "utr_in_narration",
+      "utr_edit_distance",
+      "counterparty_in_narration",
+      "counterparty_match_frequency",
+      "delta_matches_fee",
+      "delta_matches_tds",
+      "delta_matches_known_rate",
+      "in_plausible_subset_sum",
+      "n_blocking_passes",
+      "credit_is_larger",
+      "invoice_receipt_given",
+      "invoice_link_score",
+      "invoice_amount_ratio",
+      "invoice_date_delta_days"
+    ],
+    "version": "1.1.0"
+  },
+  "feature_schema_version": "1.1.0",
+  "metrics": {
+    "calibration_split_in_sample": {
+      "brier": 0.006071,
+      "ece": 0.0,
+      "n": 1405,
+      "note": "near zero by construction - isotonic fits its own split almost perfectly. Recorded only to show the gap against the honest number."
+    },
+    "evaluation_out_of_sample": {
+      "brier": 0.016449,
+      "ece": 0.010436,
+      "mce": 0.364118,
+      "n": 1958,
+      "note": "the honest number: neither model nor calibrator saw this split"
+    },
+    "reliability_bins": [
+      {
+        "gap": 0.00392,
+        "lower": 0.0,
+        "mean_predicted": 0.00013,
+        "n": 989,
+        "observed_rate": 0.00404,
+        "upper": 0.1
+      },
+      {
+        "gap": 0.15909,
+        "lower": 0.2,
+        "mean_predicted": 0.25,
+        "n": 22,
+        "observed_rate": 0.40909,
+        "upper": 0.3
+      },
+      {
+        "gap": 0.0303,
+        "lower": 0.6,
+        "mean_predicted": 0.66667,
+        "n": 11,
+        "observed_rate": 0.63636,
+        "upper": 0.7
+      },
+      {
+        "gap": 0.27348,
+        "lower": 0.7,
+        "mean_predicted": 0.72652,
+        "n": 2,
+        "observed_rate": 1.0,
+        "upper": 0.8
+      },
+      {
+        "gap": 0.36412,
+        "lower": 0.8,
+        "mean_predicted": 0.86412,
+        "n": 2,
+        "observed_rate": 0.5,
+        "upper": 0.9
+      },
+      {
+        "gap": 0.01229,
+        "lower": 0.9,
+        "mean_predicted": 0.99083,
+        "n": 932,
+        "observed_rate": 0.97854,
+        "upper": 1.0
+      }
+    ],
+    "time_split_out_of_sample": {
+      "brier": 0.019447,
+      "ece": 0.016119,
+      "mce": 0.355431,
+      "method": "isotonic",
+      "n": 1091
+    }
+  },
+  "model_version": "v1-206ee339bd85",
+  "operating_point": {
+    "coverage": 0.513971,
+    "floor_met": true,
+    "n_auto_matched": 607,
+    "n_false_matches": 3,
+    "precision": 0.995058,
+    "precision_floor": 0.995,
+    "recall": 0.649462,
+    "selection_rule": "highest coverage holding precision >= floor, on a split neither the classifier nor the calibrator saw",
+    "threshold": 0.998921
+  },
+  "split": {
+    "n_calibration": 1405,
+    "n_evaluation": 1958,
+    "n_fit": 3942,
+    "primary": "three_way_group_by_settlement_id",
+    "secondary": "time_based_earlier_vs_later",
+    "seed": 17,
+    "stages": "fit -> calibrate -> evaluate; no settlement crosses a boundary",
+    "why": "One settlement produces several near-identical candidates. A random split puts near-duplicates on both sides, so calibration would measure memorisation -- and calibration quality is the thesis."
+  },
+  "trained_on": "data/train"
+}

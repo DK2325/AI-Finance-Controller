@@ -71,9 +71,53 @@ def recon(
         None, "--threshold", help="Operating point. Defaults to the selected point."
     ),
     run: str = typer.Option("", "--run", help="Run id to write. Defaults to recon-<batch>."),
+    model: Path | None = typer.Option(
+        None, "--model", help="Artifact directory. Without it, rule tiers only."
+    ),
 ) -> None:
     """Reconcile a batch: deterministic, then fuzzy, then learned, then LLM on the residue."""
     from core.pipeline import reconcile
+
+    if model is not None:
+        from evals.models import Prediction, Run, Triple
+        from evals.runs import FilesystemRunStore
+        from model.artifact import Artifact, FeatureSchemaMismatch
+        from model.predict import predict_batch
+
+        try:
+            artifact = Artifact.load(model)
+        except FeatureSchemaMismatch as exc:
+            typer.echo(f"error: {exc}", err=True)
+            raise typer.Exit(code=3) from exc
+
+        scored = predict_batch(in_dir, artifact)
+        selected = [
+            s for s in scored if threshold is None or s.probability >= threshold
+        ]
+        run_id = run or f"model-{Path(in_dir).name}"
+        FilesystemRunStore().save(
+            Run(
+                run_id=run_id,
+                batch_dir=str(in_dir).replace("\\", "/"),
+                predictions=[
+                    Prediction(Triple(*s.triple), s.probability, "model") for s in selected
+                ],
+                meta={
+                    "calibrated": True,
+                    "model_version": artifact.model_version,
+                    "feature_schema_version": artifact.feature_schema_version,
+                    "calibration_method": artifact.calibration["method"],
+                    "operating_point": artifact.operating_point,
+                    "trained_on": artifact.trained_on,
+                    "excluded_cases": artifact.excluded_cases,
+                    "mock_llm": mock_llm,
+                },
+            )
+        )
+        typer.echo(f"scored {in_dir} with {artifact.model_version} -> run '{run_id}'")
+        typer.echo(f"  {len(selected)} matches of {len(scored)} resolved candidates")
+        typer.echo(f"  calibrated probabilities ({artifact.calibration['method']})")
+        return
     from evals.models import Prediction, Run, Triple
     from evals.runs import FilesystemRunStore
 
@@ -114,6 +158,59 @@ def recon(
     )
     typer.echo("")
     typer.echo("  NOTE: rule scores are ranked tiers, not calibrated probabilities.")
+
+
+@app.command()
+def train(
+    batch: Path = typer.Option(Path("data/train"), "--batch", help="Batch to train on."),
+    out: Path = typer.Option(Path("runs/_models/v1"), "--out", help="Artifact directory."),
+    chart: Path = typer.Option(
+        Path("notes/reliability.png"), "--chart", help="Reliability diagram output."
+    ),
+) -> None:
+    """Train and calibrate the classifier, and select an operating point.
+
+    A fifth command beyond BUILD.md's four. Training is a distinct operation with its own
+    inputs and artifact, and hiding it inside recon would make the canonical interface
+    lie about what it does.
+    """
+    from evals.training import build_dataset
+    from model.calibration import ReliabilityBin
+    from model.chart import render_reliability
+    from model.train import train as run_train
+
+    dataset_path = Path("runs/_datasets") / f"{batch.name}.csv"
+    summary = build_dataset(batch, dataset_path)
+    typer.echo(
+        f"dataset {dataset_path}: {summary['n_candidates']} candidates, "
+        f"{summary['n_positive']} positive (base rate {summary['base_rate']:.1%}), "
+        f"{summary['share_unscored_by_rules']:.1%} scored by no rule"
+    )
+
+    artifact = run_train(dataset_path, out, trained_on=str(batch).replace("\\", "/"))
+    m = artifact.manifest()
+
+    metrics = m["metrics"]["evaluation_out_of_sample"]
+    bins = [ReliabilityBin(**{k: v for k, v in b.items() if k != "gap"})
+            for b in m["metrics"]["reliability_bins"]]
+    render_reliability(bins, chart, ece=metrics["ece"], title="Calibration - v1")
+
+    op = m["operating_point"]
+    typer.echo("")
+    typer.echo(f"model {m['model_version']}  ({m['algorithm']})")
+    typer.echo(f"  calibration      {m['calibration']['method']} "
+               f"(beat {'platt' if m['calibration']['method'] == 'isotonic' else 'isotonic'} "
+               f"by {m['calibration']['margin_over_runner_up']:.5f} ECE)")
+    typer.echo(f"  out-of-sample    ECE {metrics['ece']:.5f}  MCE {metrics['mce']:.5f}  "
+               f"Brier {metrics['brier']:.5f}  n={metrics['n']}")
+    typer.echo(f"  operating point  threshold {op['threshold']:.4f} -> "
+               f"coverage {op['coverage']:.2%} at precision {op['precision']:.4%}")
+    if not op.get("floor_met", True):
+        typer.echo(f"  WARNING: precision floor {op['precision_floor']:.3%} NOT met "
+                   f"(shortfall {op['shortfall']:.4%})")
+    typer.echo("")
+    typer.echo(f"  artifact            -> {out}")
+    typer.echo(f"  reliability diagram -> {chart}")
 
 
 @app.command(name="eval")

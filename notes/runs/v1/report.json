@@ -1,0 +1,357 @@
+{
+  "batch_dir": "data/train",
+  "confusion_by_case_type": {
+    "held_out": {},
+    "seen": {
+      "batched_settlement": {
+        "matched": 106,
+        "missed": 553,
+        "refused": 0,
+        "total": 659
+      },
+      "clean": {
+        "matched": 1756,
+        "missed": 1266,
+        "refused": 0,
+        "total": 3022
+      },
+      "date_skew": {
+        "matched": 68,
+        "missed": 97,
+        "refused": 0,
+        "total": 165
+      },
+      "duplicate_utr": {
+        "matched": 70,
+        "missed": 40,
+        "refused": 0,
+        "total": 110
+      },
+      "fee_deducted": {
+        "matched": 316,
+        "missed": 233,
+        "refused": 0,
+        "total": 549
+      },
+      "orphan": {
+        "matched": 0,
+        "missed": 0,
+        "refused": 55,
+        "total": 55
+      },
+      "partial_payment": {
+        "matched": 148,
+        "missed": 182,
+        "refused": 0,
+        "total": 330
+      },
+      "rounding_drift": {
+        "matched": 31,
+        "missed": 79,
+        "refused": 0,
+        "total": 110
+      }
+    }
+  },
+  "curve": {
+    "is_degenerate": false,
+    "n_points": 23,
+    "points": [
+      {
+        "coverage": 0.5045500505561172,
+        "money_error_ratio": 0.0008912944454271174,
+        "money_weighted_precision": 0.9982399230913356,
+        "n_false_positives": 3,
+        "n_predicted": 2495,
+        "n_true_positives": 2492,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9987975951903808,
+        "recall": 0.503943377148635,
+        "threshold": 1.0
+      },
+      {
+        "coverage": 0.5047522750252781,
+        "money_error_ratio": 0.0008912944454271174,
+        "money_weighted_precision": 0.9982400423306969,
+        "n_false_positives": 3,
+        "n_predicted": 2496,
+        "n_true_positives": 2493,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9987980769230769,
+        "recall": 0.5041456016177958,
+        "threshold": 0.9994442426413319
+      },
+      {
+        "coverage": 0.5049544994944388,
+        "money_error_ratio": 0.0008912944454271174,
+        "money_weighted_precision": 0.9982402516439894,
+        "n_false_positives": 3,
+        "n_predicted": 2497,
+        "n_true_positives": 2494,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9987985582699239,
+        "recall": 0.5043478260869565,
+        "threshold": 0.9993830487617803
+      },
+      {
+        "coverage": 0.5051567239635996,
+        "money_error_ratio": 0.0008912944454271174,
+        "money_weighted_precision": 0.9982414284730818,
+        "n_false_positives": 3,
+        "n_predicted": 2498,
+        "n_true_positives": 2495,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9987990392313851,
+        "recall": 0.5045500505561172,
+        "threshold": 0.9989205103956678
+      },
+      {
+        "coverage": 0.5053589484327604,
+        "money_error_ratio": 0.0008912944454271174,
+        "money_weighted_precision": 0.9982415102743255,
+        "n_false_positives": 3,
+        "n_predicted": 2499,
+        "n_true_positives": 2496,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9987995198079231,
+        "recall": 0.5047522750252781,
+        "threshold": 0.9976779899935804
+      },
+      {
+        "coverage": 0.5055611729019212,
+        "money_error_ratio": 0.0008912944454271174,
+        "money_weighted_precision": 0.9982417618703663,
+        "n_false_positives": 3,
+        "n_predicted": 2500,
+        "n_true_positives": 2497,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9988,
+        "recall": 0.5049544994944388,
+        "threshold": 0.9957781647855795
+      },
+      {
+        "coverage": 0.5057633973710819,
+        "money_error_ratio": 0.0008912944454271174,
+        "money_weighted_precision": 0.9982424623737196,
+        "n_false_positives": 3,
+        "n_predicted": 2501,
+        "n_true_positives": 2498,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9988004798080767,
+        "recall": 0.5051567239635996,
+        "threshold": 0.993754961681059
+      },
+      {
+        "coverage": 0.6535894843276037,
+        "money_error_ratio": 0.000967176738633351,
+        "money_weighted_precision": 0.9985014407457241,
+        "n_false_positives": 4,
+        "n_predicted": 3232,
+        "n_true_positives": 3228,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9987623762376238,
+        "recall": 0.6527805864509606,
+        "threshold": 0.9927536231884058
+      },
+      {
+        "coverage": 0.6537917087967644,
+        "money_error_ratio": 0.000967176738633351,
+        "money_weighted_precision": 0.9985020278172518,
+        "n_false_positives": 4,
+        "n_predicted": 3233,
+        "n_true_positives": 3229,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9987627590473245,
+        "recall": 0.6529828109201213,
+        "threshold": 0.9913616149189112
+      },
+      {
+        "coverage": 0.6539939332659251,
+        "money_error_ratio": 0.000967176738633351,
+        "money_weighted_precision": 0.9985021173184424,
+        "n_false_positives": 4,
+        "n_predicted": 3234,
+        "n_true_positives": 3230,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9987631416202845,
+        "recall": 0.6531850353892821,
+        "threshold": 0.9758016887976488
+      },
+      {
+        "coverage": 0.654196157735086,
+        "money_error_ratio": 0.000967176738633351,
+        "money_weighted_precision": 0.998502192063523,
+        "n_false_positives": 4,
+        "n_predicted": 3235,
+        "n_true_positives": 3231,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9987635239567233,
+        "recall": 0.6533872598584429,
+        "threshold": 0.9736463139472984
+      },
+      {
+        "coverage": 0.6543983822042467,
+        "money_error_ratio": 0.000967176738633351,
+        "money_weighted_precision": 0.9985033310316996,
+        "n_false_positives": 4,
+        "n_predicted": 3236,
+        "n_true_positives": 3232,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9987639060568603,
+        "recall": 0.6535894843276037,
+        "threshold": 0.9598350416190832
+      },
+      {
+        "coverage": 0.6546006066734075,
+        "money_error_ratio": 0.000967176738633351,
+        "money_weighted_precision": 0.9985045017599313,
+        "n_false_positives": 4,
+        "n_predicted": 3237,
+        "n_true_positives": 3233,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9987642879209144,
+        "recall": 0.6537917087967644,
+        "threshold": 0.9564308388107668
+      },
+      {
+        "coverage": 0.6548028311425682,
+        "money_error_ratio": 0.000967176738633351,
+        "money_weighted_precision": 0.9985052325336256,
+        "n_false_positives": 4,
+        "n_predicted": 3238,
+        "n_true_positives": 3234,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9987646695491044,
+        "recall": 0.6539939332659251,
+        "threshold": 0.9561322380144955
+      },
+      {
+        "coverage": 0.7261880687563195,
+        "money_error_ratio": 0.0022951168697424376,
+        "money_weighted_precision": 0.996804622587342,
+        "n_false_positives": 7,
+        "n_predicted": 3591,
+        "n_true_positives": 3584,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9980506822612085,
+        "recall": 0.7247724974721942,
+        "threshold": 0.9452054794520548
+      },
+      {
+        "coverage": 0.7263902932254803,
+        "money_error_ratio": 0.0022951168697424376,
+        "money_weighted_precision": 0.996804693140533,
+        "n_false_positives": 7,
+        "n_predicted": 3592,
+        "n_true_positives": 3585,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9980512249443207,
+        "recall": 0.7249747219413549,
+        "threshold": 0.9448527987171835
+      },
+      {
+        "coverage": 0.7314459049544995,
+        "money_error_ratio": 0.002485174190716544,
+        "money_weighted_precision": 0.9965661513246761,
+        "n_false_positives": 8,
+        "n_predicted": 3617,
+        "n_true_positives": 3609,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9977882222836605,
+        "recall": 0.7298281092012133,
+        "threshold": 0.9230769230769231
+      },
+      {
+        "coverage": 0.7316481294236603,
+        "money_error_ratio": 0.002485174190716544,
+        "money_weighted_precision": 0.9965661853837431,
+        "n_false_positives": 8,
+        "n_predicted": 3618,
+        "n_true_positives": 3610,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9977888336097291,
+        "recall": 0.7300303336703741,
+        "threshold": 0.8804869991286252
+      },
+      {
+        "coverage": 0.731850353892821,
+        "money_error_ratio": 0.002485174190716544,
+        "money_weighted_precision": 0.9965669823026233,
+        "n_false_positives": 8,
+        "n_predicted": 3619,
+        "n_true_positives": 3611,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9977894445979553,
+        "recall": 0.7302325581395349,
+        "threshold": 0.7269519982387143
+      },
+      {
+        "coverage": 0.7320525783619818,
+        "money_error_ratio": 0.002485174190716544,
+        "money_weighted_precision": 0.9965672804581788,
+        "n_false_positives": 8,
+        "n_predicted": 3620,
+        "n_true_positives": 3612,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9977900552486187,
+        "recall": 0.7304347826086957,
+        "threshold": 0.7260915239545117
+      },
+      {
+        "coverage": 0.735288169868554,
+        "money_error_ratio": 0.00272546811920295,
+        "money_weighted_precision": 0.9962539279718262,
+        "n_false_positives": 10,
+        "n_predicted": 3636,
+        "n_true_positives": 3626,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9972497249724972,
+        "recall": 0.7332659251769464,
+        "threshold": 0.6666666666666666
+      },
+      {
+        "coverage": 0.7377148634984834,
+        "money_error_ratio": 0.003312292451369376,
+        "money_weighted_precision": 0.9954598123915779,
+        "n_false_positives": 12,
+        "n_predicted": 3648,
+        "n_true_positives": 3636,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9967105263157895,
+        "recall": 0.735288169868554,
+        "threshold": 0.25
+      },
+      {
+        "coverage": 0.7482305358948432,
+        "money_error_ratio": 0.01657605687535792,
+        "money_weighted_precision": 0.9776953354180307,
+        "n_false_positives": 62,
+        "n_predicted": 3700,
+        "n_true_positives": 3638,
+        "orphan_refusal_rate": 0.9818181818181818,
+        "precision": 0.9832432432432432,
+        "recall": 0.7356926188068756,
+        "threshold": 0.0
+      }
+    ]
+  },
+  "run_id": "v1-train",
+  "score": {
+    "coverage": 0.5051567239635996,
+    "matched_money": 20037427799,
+    "money_error_ratio": 0.0008912944454271174,
+    "money_weighted_precision": 0.9982414284730818,
+    "n_decidable": 4945,
+    "n_false_positives": 3,
+    "n_orphans": 55,
+    "n_orphans_refused": 55,
+    "n_predicted": 2498,
+    "n_true_positives": 2495,
+    "orphan_refusal_rate": 1.0,
+    "precision": 0.9987990392313851,
+    "recall": 0.5045500505561172,
+    "threshold": 0.9989,
+    "total_money": 39534914843,
+    "wrong_money": 35237250
+  }
+}

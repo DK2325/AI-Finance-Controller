@@ -27,7 +27,7 @@ from core.records import BankTxn, Settlement, Sources
 
 # Bump on any change to the emitted keys. Phase 4 stamps this into the model artifact and
 # Phase 7 refuses to score with a mismatched version.
-FEATURE_SCHEMA_VERSION = "1.0.0"
+FEATURE_SCHEMA_VERSION = "1.1.0"
 
 FEATURE_NAMES: tuple[str, ...] = (
     "amount_delta_abs",
@@ -49,6 +49,14 @@ FEATURE_NAMES: tuple[str, ...] = (
     "in_plausible_subset_sum",
     "n_blocking_passes",
     "credit_is_larger",
+    # Invoice-link evidence. Added in 1.1.0: only ~38% of gateway rows carry
+    # order_receipt, so how the invoice was reached is itself evidence about whether the
+    # triple is right. Without these the classifier cannot distinguish a link the
+    # merchant asserted from one inferred through a narration.
+    "invoice_receipt_given",
+    "invoice_link_score",
+    "invoice_amount_ratio",
+    "invoice_date_delta_days",
 )
 
 # Sentinel for "this comparison could not be made" -- an unparseable date, usually.
@@ -99,6 +107,10 @@ def extract(
     passes: frozenset[str],
     frequencies: dict[str, int],
     in_subset_sum: bool = False,
+    invoice_link_score: float = 0.0,
+    invoice_receipt_given: bool = False,
+    invoice_amount: int = 0,
+    invoice_date_delta: int | None = None,
 ) -> dict[str, float]:
     """One feature vector. Keys are exactly FEATURE_NAMES, in that order."""
     delta = txn.credit - settlement.net_amount
@@ -145,6 +157,14 @@ def extract(
         "in_plausible_subset_sum": float(in_subset_sum),
         "n_blocking_passes": float(len(passes)),
         "credit_is_larger": float(txn.credit > settlement.net_amount),
+        "invoice_receipt_given": float(invoice_receipt_given),
+        "invoice_link_score": float(invoice_link_score),
+        "invoice_amount_ratio": (
+            float(settlement.amount) / invoice_amount if invoice_amount > 0 else 0.0
+        ),
+        "invoice_date_delta_days": float(
+            invoice_date_delta if invoice_date_delta is not None else MISSING_DAYS
+        ),
     }
 
 

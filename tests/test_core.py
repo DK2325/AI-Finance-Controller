@@ -459,9 +459,19 @@ def test_feature_schema_is_versioned_for_the_model_artifact() -> None:
 
 
 def test_feature_order_is_stable() -> None:
-    """Reordering silently feeds the model different columns than it trained on."""
+    """Reordering silently feeds the model different columns than it trained on.
+
+    Pinned together with the schema version: changing the feature list without bumping
+    the version is the exact failure the version exists to prevent, so this test forces
+    both to move at once. 1.1.0 added the four invoice-link features.
+    """
+    from core.features import FEATURE_SCHEMA_VERSION
+
+    assert FEATURE_SCHEMA_VERSION == "1.1.0"
+    assert len(FEATURE_NAMES) == 23
     assert FEATURE_NAMES[0] == "amount_delta_abs"
-    assert FEATURE_NAMES[-1] == "credit_is_larger"
+    assert FEATURE_NAMES[-1] == "invoice_date_delta_days"
+    assert FEATURE_NAMES[18] == "credit_is_larger", "1.0.0 features must keep their positions"
 
 
 def test_fee_and_tds_features_fire_on_the_right_cases() -> None:
