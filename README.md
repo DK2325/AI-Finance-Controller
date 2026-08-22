@@ -117,6 +117,37 @@ entries, and writes exception reasons. Match/no-match is always a scored decisio
 the deterministic or learned layers, because this is a financial control and generation
 is not adjudication.
 
+## How the LLM is constrained
+
+The LLM never decides a match. It parses narration, proposes journal entries, and writes
+exception reasons — and every response is constrained at decode time rather than parsed
+hopefully.
+
+Measured on 50 real narrations from `data/train`, ugliest-weighted, against the real
+parser schema (nested object, enum, optionals, bounded float):
+
+| how the response is requested | schema failures | p95 latency |
+|---|---|---|
+| plain prompt asking for JSON | **4.0%** | 5.57s |
+| `response_format: json_object` | **4.0%** | 10.69s |
+| `nvext.guided_json` | **unsupported (400)** | — |
+| **`response_format: json_schema`, strict** | **0.0%** | **4.12s** |
+
+**`json_object` guarantees valid JSON, not a valid object.** Its two failures show the
+difference concretely: one response was not JSON at all, and the other was perfectly valid
+JSON in which `counterparty_name` was not a string. `{}` is valid JSON too. A schema is
+what makes the *shape* a guarantee, and `json_schema` delivered 50 of 50 — while also
+being the fastest at p95, because constrained decoding cannot ramble.
+
+The retry-then-exception path still exists, and `LLM_MALFORMED_RESPONSE` is still a reason
+code. 4.0% unconstrained is roughly 280 malformed responses across a 25,000-row run, and a
+provider without `json_schema` makes that path load-bearing immediately.
+
+**43% of exceptions never reach the LLM at all.** `NO_CANDIDATE` and `NO_INVOICE_LINK` are
+facts the pipeline already knows. Sending those to a model would be generative work a rule
+can settle — architecture rule 1 forbids it. The reduced inference bill is a consequence
+of that rule, not a reason for it.
+
 ## Running it
 
 Docker Compose is the primary run path, not an optional extra.

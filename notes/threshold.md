@@ -158,3 +158,36 @@ Feature schema **1.1.0**, 23 features. The artifact records it and `Artifact.loa
 **refuses to return a model** whose schema does not match the running code — a mismatch
 would feed the model columns it never trained on and produce plausible, wrong numbers
 silently.
+
+---
+
+## The operating point has three consequences, not two
+
+The floor was chosen on precision against coverage. That framing is incomplete: the same
+threshold also sets the inference bill, because everything not auto-matched becomes an
+exception, and a share of exceptions cost an LLM call.
+
+Measured on `data/train` at 25,000-row scale:
+
+| precision floor | coverage | residue | LLM-worthy exceptions | run time at 40 rpm |
+|---|---|---|---|---|
+| **99.5%** *(selected)* | 51.4% | 48.6% | ~6,990 | ~9 min batched |
+| 99.0% | 77.7% | 22.4% | ~3,220 | ~4 min batched |
+
+Not every exception needs a model. 43% of them resolve to a reason code the pipeline
+already knows -- `NO_CANDIDATE` (blocking produced nothing) and `NO_INVOICE_LINK` (no
+invoice inferable). Sending those to an LLM would be generative work a rule can settle,
+which architecture rule 1 forbids. The cost saving is a *consequence* of the rule, not a
+motivation for bending it.
+
+**The floor stays at 99.5%.** The point of recording this is that a merchant choosing an
+operating point is choosing three things at once:
+
+1. **review workload** -- how many exceptions a human must look at
+2. **wrong matches** -- how much money is misposted
+3. **inference cost** -- what the residue costs to explain
+
+Phase 6's slider should surface all three. A curve showing coverage and precision alone
+asks the merchant to optimise half a problem; showing estimated cost alongside makes the
+unit-economics argument interactive rather than a paragraph in the README, and it is the
+same number Phase 7 reports as cost per 1,000 rows.

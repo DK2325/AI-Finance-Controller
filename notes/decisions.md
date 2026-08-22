@@ -230,3 +230,62 @@ hazard, observed rather than argued.
    rate" for `json_object` when all four failures were 429s. Conflating transport with
    conformance would have made the retry path look load-bearing when it was the rate
    limiter talking. The two are separate columns now.
+
+---
+
+## Spike: is batching exceptions safe? (23 Aug 2026)
+
+Batching takes a 25,000-row run from 175 minutes to under 10. It was measured rather than
+assumed, because a reason attached to the wrong exception is worse than no reason -- it
+looks right.
+
+### Structural integrity: perfect at both sizes
+
+| | calls | items sent -> returned | all ids present | order stable | p50 | p95 | tokens/item |
+|---|---|---|---|---|---|---|---|
+| batch 10 | 12 | 120 -> 120 | 12/12 | 12/12 | 8.49s | 22.13s | 76 |
+| batch 20 | 6 | 120 -> 120 | 6/6 | 6/6 | 14.45s | 22.02s | 75 |
+
+No dropped items, no reordering, at either size. Tokens per item are identical, so
+batching is nearly free on tokens -- the saving is entirely in request count.
+
+**Batch size 20 selected.** Ordering held identically, p95 is the same, and 20 halves the
+requests. The only argument for 10 was reliability, and the two are equally reliable
+structurally -- while *neither* is safe without the provenance check below.
+
+### And yet a field still crossed between items
+
+Structural checks verify the **envelope**, not the **contents**. With every id echoed
+correctly and order perfectly stable, item `EX0020` came back carrying `EX0027`'s UTR.
+
+Measured rate across ~200 batched items: **one occurrence, roughly 0.5%.** A later run of
+160 items reproduced none, which is the point -- at 25,000-row scale that is still around
+**35 mis-attributed fields per run**: rare enough that sampling will not catch it,
+frequent enough to be certain in production.
+
+**This is why `llm/` verifies every extracted field against its own source before the
+field is allowed to matter.** Not "the model is unreliable", but "this failure is rare
+enough that testing cannot be relied on to find it, so it must be structurally unable to
+reach the ledger". Failures route to `FIELD_PROVENANCE_FAILED`. The check is regex and
+substring -- no second model call.
+
+*How it was nearly missed:* the first classifier compared raw model output against bare
+digits and filed every mismatch as harmless mis-extraction. Normalising the prefix first
+turned one of them into cross-contamination. A check that is not normalised before
+comparison reports the reassuring answer.
+
+### Other results
+
+**Partial malformation degrades gracefully.** A contentless item (`-----`) inside a batch
+of 10 returned all 10 entries, the bad one as `parse_confidence: 0.0`,
+`payment_method: "unknown"`, rather than failing the response. So **fallback is per-item,
+not per-batch**, and low `parse_confidence` must route to the exception queue rather than
+be trusted.
+
+**Quality drift: 96.55% field agreement** between batched and single-call extraction on
+the same narrations (56 agreements, 2 disagreements). **The 3.45% is a real cost of
+batching** and is recorded here rather than absorbed. It buys a 20x reduction in requests.
+
+**Prefix retention: 9.38%** returned `UTR300000001379` where the field wanted
+`300000001379` -- right row, wrong format. A prompt and schema-description fix, and the
+provenance check catches it regardless, since the digits do appear in that narration.

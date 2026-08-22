@@ -1,0 +1,58 @@
+{
+  "model": "nvidia/nemotron-3-super-120b-a12b",
+  "batch_10": {
+    "batch": "10",
+    "calls": 12,
+    "call_failures": 0,
+    "items_sent": 120,
+    "items_returned": 120,
+    "calls_with_all_ids": 12,
+    "calls_order_stable": 12,
+    "mapped_right": 113,
+    "mapped_wrong": 7,
+    "p50_seconds": 8.49,
+    "p95_seconds": 22.13,
+    "mean_tokens_per_item": 76
+  },
+  "batch_20": {
+    "batch": "20",
+    "calls": 6,
+    "call_failures": 0,
+    "items_sent": 120,
+    "items_returned": 120,
+    "calls_with_all_ids": 6,
+    "calls_order_stable": 6,
+    "mapped_right": 113,
+    "mapped_wrong": 7,
+    "p50_seconds": 14.45,
+    "p95_seconds": 22.02,
+    "mean_tokens_per_item": 75
+  },
+  "partial_malformation": {
+    "ok": true,
+    "seconds": 5.325636500001565,
+    "tokens": 770,
+    "sent": 10,
+    "returned": 10,
+    "ids_all_present": true,
+    "order_stable": true,
+    "mapped_right": 8,
+    "mapped_wrong": 1,
+    "contentless_item_returned": true,
+    "contentless_item": {
+      "id": "EX9999",
+      "counterparty_name": "",
+      "payment_method": "unknown",
+      "utr": "",
+      "parse_confidence": 0.0
+    }
+  },
+  "quality_drift": {
+    "compared": 30,
+    "field_agreements": 56,
+    "field_disagreements": 2,
+    "agreement_rate": 0.9655,
+    "single_call_utr_correct": 20,
+    "mean_single_seconds": 2.81
+  }
+}
