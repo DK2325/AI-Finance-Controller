@@ -175,3 +175,58 @@ an assumption to carry in.
 
 The client is the `openai` SDK against `https://integrate.api.nvidia.com/v1`, now a
 declared dependency.
+
+---
+
+## Spike: structured output on the hosted NIM endpoint (23 Aug 2026)
+
+Ran before locking the `llm/` design, because the answer changes the implementation
+rather than tuning it. 50 real narrations from `data/train`, ugliest-weighted, against a
+schema representative of the real parser (nested object, enum, optionals, list, bounded
+float). `enable_thinking` false throughout. Script and raw results in `notes/spikes/`.
+
+| config | completed | valid | schema failures | p50 | p95 | out tokens |
+|---|---|---|---|---|---|---|
+| plain prompt | 50 | 48 | **4.0%** | 1.69s | 5.57s | 123 |
+| `response_format: json_object` | 50 | 48 | **4.0%** | 1.66s | 10.69s | 138 |
+| `nvext.guided_json` | — | — | **unsupported** | — | — | — |
+| **`response_format: json_schema`** | 50 | **50** | **0.0%** | 2.56s | **4.12s** | 124 |
+
+### `guided_json` does not exist on this endpoint
+
+It returns 400, and the error enumerates what `nvext` does accept: `greed_sampling`,
+`use_raw_prompt`, `annotations`, `backend_instance_id`, `token_data`,
+`max_thinking_tokens`, `cache_salt`, `extra_fields`, `metadata_upload`, routing fields.
+NVIDIA's guided-decoding documentation describes **self-hosted** NIM.
+
+### OpenAI-style `json_schema` is supported, and is the better answer anyway
+
+`response_format={"type":"json_schema","json_schema":{...,"strict":true}}` works, and
+gives the decode-time guarantee `guided_json` was supposed to provide. It is also the
+standard OpenAI shape, so it survives a provider swap -- which the provider interface
+needs anyway.
+
+**It is also the fastest at p95**: 4.12s against 10.69s for `json_object`. Constrained
+decoding cannot ramble, so the tail collapses. Safest and most predictable at once.
+
+### `json_object` guarantees valid JSON, not a valid *object*
+
+Its two failures were one `not_json` and one **`counterparty_name: Input should be a
+valid string`** -- syntactically valid JSON of the wrong shape. That is the `{}`-is-valid
+hazard, observed rather than argued.
+
+### Consequences for Phase 5
+
+1. **Use `json_schema`.** Retry-then-exception stays, but as a safety net that should
+   almost never fire. The README line is "0.0% schema failures across 50 calls,
+   grammar-constrained at decode time" rather than a retry count.
+2. **Keep the retry path real.** 4.0% unconstrained is ~280 malformed responses across a
+   25,000-row run. If a future provider lacks `json_schema`, that path becomes
+   load-bearing immediately, so the reason-code enum still needs `LLM_MALFORMED_RESPONSE`.
+3. **Rate limit is 40 rpm, and it is a throughput cap, not a quota** -- nothing to
+   exhaust. Concurrency 4 produced four 429s; a 36 rpm token bucket produced zero across
+   150 calls. Pace, then back off; a rejection costs a round trip *and* a sleep.
+4. **Measurement bug worth recording:** the first run reported an "8% schema failure
+   rate" for `json_object` when all four failures were 429s. Conflating transport with
+   conformance would have made the retry path look load-bearing when it was the rate
+   limiter talking. The two are separate columns now.

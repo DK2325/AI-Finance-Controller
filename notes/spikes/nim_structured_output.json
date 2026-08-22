@@ -1,0 +1,58 @@
+{
+  "model": "nvidia/nemotron-3-super-120b-a12b",
+  "n_calls": 50,
+  "results": [
+    {
+      "config": "plain",
+      "n": 50,
+      "completed": 50,
+      "valid": 48,
+      "schema_failure_rate": 0.04,
+      "transport_failures": 0,
+      "p50_seconds": 1.69,
+      "p95_seconds": 5.57,
+      "mean_prompt_tokens": 198,
+      "mean_completion_tokens": 123,
+      "failures": {
+        "not_json": 2
+      },
+      "wall_seconds": 99.3
+    },
+    {
+      "config": "json_object",
+      "n": 50,
+      "completed": 50,
+      "valid": 48,
+      "schema_failure_rate": 0.04,
+      "transport_failures": 0,
+      "p50_seconds": 1.66,
+      "p95_seconds": 10.69,
+      "mean_prompt_tokens": 198,
+      "mean_completion_tokens": 138,
+      "failures": {
+        "not_json": 1,
+        "schema": 1
+      },
+      "wall_seconds": 245.2
+    },
+    {
+      "config": "guided_json",
+      "unsupported": "BadRequestError: Error code: 400 - {'error': {'message': 'unknown field `guided_json`, expected one of `greed_sampling`, `use_raw_prompt`, `annotations`, `backend_instance_id`, ",
+      "wall_seconds": 0.9
+    },
+    {
+      "config": "json_schema",
+      "n": 50,
+      "completed": 50,
+      "valid": 50,
+      "schema_failure_rate": 0.0,
+      "transport_failures": 0,
+      "p50_seconds": 2.56,
+      "p95_seconds": 4.12,
+      "mean_prompt_tokens": 198,
+      "mean_completion_tokens": 124,
+      "failures": {},
+      "wall_seconds": 87.3
+    }
+  ]
+}
