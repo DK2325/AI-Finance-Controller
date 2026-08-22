@@ -1,9 +1,12 @@
 # Worked examples - one instance of every case type
 
-Generated from `data/demo/` (seed 99, all ten case types). Every figure below is
-copied from the CSVs; the arithmetic is shown so a reviewer can check a row by hand
-without running anything. Money in the gateway file is integer paise, as Razorpay
-reports it; the bank and ledger files use two-decimal rupees.
+Generated from `data/demo/` (seed 99, all ten case types). Every figure is copied from
+the CSVs; the arithmetic is shown so a reviewer can check a row by hand without running
+anything. Gateway money is integer paise, as Razorpay reports it.
+
+Note `order_receipt`: populated on only ~38% of gateway rows. Where it is empty the
+invoice link does not exist in the data and must be inferred through the bank
+narration - see notes/failure-modes.md.
 
 Regenerate with: `ledgerloop generate --rows 500 --seed 99 --out data/demo`
 
@@ -16,31 +19,36 @@ Regenerate with: `ledgerloop generate --rows 500 --seed 99 --out data/demo`
 
 | file | key | value |
 |---|---|---|
-| invoice_ledger | `INV-2026-000001` | HALDIA GARMENTS PRIVATE LIMITED - Rs 315278.00 |
-| gateway | `pay_000000000001` type=payment | amount=31527800 fee=630556 tax=113500 net=30783744 |
-| gateway | `pay_000000000002` type=payment | amount=7085899 fee=141718 tax=25509 net=6918672 |
-| gateway | `pay_000000000003` type=payment | amount=38322250 fee=766445 tax=137960 net=37417845 |
-| gateway | `pay_000000000004` type=payment | amount=49297925 fee=985959 tax=177473 net=48134493 |
-| gateway | `pay_000000000005` type=payment | amount=22206075 fee=444122 tax=79942 net=21682011 |
+| invoice_ledger | `INV-2026-000001` | BHAVNAGAR FORGINGS LIMITED - Rs 50000.00 |
+| gateway | `pay_000000000001` type=payment | amount=5000000 fee=100000 tax=18000 net=4882000 |
+| gateway | order_receipt | `INV-2026-000001` |
+| gateway | `pay_000000000002` type=payment | amount=6946100 fee=138922 tax=25006 net=6782172 |
+| gateway | order_receipt | *(empty - must be inferred)* |
+| gateway | `pay_000000000003` type=payment | amount=4515650 fee=90313 tax=16256 net=4409081 |
+| gateway | order_receipt | *(empty - must be inferred)* |
+| gateway | `pay_000000000004` type=payment | amount=14142400 fee=282848 tax=50913 net=13808639 |
+| gateway | order_receipt | *(empty - must be inferred)* |
+| gateway | `pay_000000000005` type=payment | amount=500000 fee=10000 tax=1800 net=488200 |
+| gateway | order_receipt | *(empty - must be inferred)* |
 | gateway | settlement | `setl_000000000001` utr=`300000000001` |
-| bank | `TXN00000001` (ICICI) | credit=Rs 1449367.65 value_date=26-06-2026 |
+| bank | `TXN00000001` (ICICI) | credit=Rs 303700.92 value_date=16-08-2026 |
 
 Narration:
 
 ```
-RTGS/ICICR52023994184/HALDIA GARMENTS PRIVATE LIMITED
+BIL/ONL/300000000001/BFL
 ```
 
 **Arithmetic**
 
 ```
-pay_000000000001: 31527800 - 630556 - 113500 = 30783744
-pay_000000000002: 7085899 - 141718 - 25509 = 6918672
-pay_000000000003: 38322250 - 766445 - 137960 = 37417845
-pay_000000000004: 49297925 - 985959 - 177473 = 48134493
-pay_000000000005: 22206075 - 444122 - 79942 = 21682011
-                         sum = 144936765 paise = Rs 1,449,367.65
-                 bank credit = 144936765 paise = Rs 1,449,367.65
+pay_000000000001: 5000000 - 100000 - 18000 = 4882000
+pay_000000000002: 6946100 - 138922 - 25006 = 6782172
+pay_000000000003: 4515650 - 90313 - 16256 = 4409081
+pay_000000000004: 14142400 - 282848 - 50913 = 13808639
+pay_000000000005: 500000 - 10000 - 1800 = 488200
+                         sum = 30370092 paise = Rs 303,700.92
+                 bank credit = 30370092 paise
                        match = True
 ```
 
@@ -52,25 +60,26 @@ pay_000000000005: 22206075 - 444122 - 79942 = 21682011
 
 | file | key | value |
 |---|---|---|
-| invoice_ledger | `INV-2026-000061` | ANANTAPUR CASTINGS LLP - Rs 16229.00 |
-| gateway | `pay_000000000061` type=payment | amount=1622900 fee=0 tax=0 net=1622900 |
+| invoice_ledger | `INV-2026-000061` | JODHPUR HANDICRAFTS LLP - Rs 465343.00 |
+| gateway | `pay_000000000061` type=payment | amount=46534300 fee=0 tax=0 net=46534300 |
+| gateway | order_receipt | `INV-2026-000061` |
 | gateway | settlement | `setl_000000000017` utr=`300000000017` |
-| bank | `TXN00000017` (ICICI) | credit=Rs 16229.00 value_date=28-06-2026 |
+| bank | `TXN00000017` (ICICI) | credit=Rs 465343.00 value_date=03-06-2026 |
 
 Narration:
 
 ```
-BIL/ONL/9937675499/ACL
+UPI/300000000017/JHL/jodhpurhan@ibl
 ```
 
 **Arithmetic**
 
 ```
-amount          = 1622900
+amount          = 46534300
 fee             = 0
 tax (18% fee)   = 0
-net             = 1622900 - 0 - 0 = 1622900
-bank credit     = 1622900 paise = Rs 16,229.00
+net             = 46534300 - 0 - 0 = 46534300
+bank credit     = 46534300 = Rs 465,343.00
 match           = True
 ```
 
@@ -78,29 +87,30 @@ match           = True
 
 ## `date_skew`
 
-> bank later by 3d
+> bank later by 1d
 
 | file | key | value |
 |---|---|---|
-| invoice_ledger | `INV-2026-000336` | HOSUR PHARMACEUTICALS INDIA PRIVATE LIMITED - Rs 489918.99 |
-| gateway | `pay_000000000336` type=payment | amount=48991899 fee=0 tax=0 net=48991899 |
+| invoice_ledger | `INV-2026-000336` | CALICUT HANDICRAFTS LLP - Rs 17146.00 |
+| gateway | `pay_000000000336` type=payment | amount=1714600 fee=0 tax=0 net=1714600 |
+| gateway | order_receipt | *(empty - must be inferred)* |
 | gateway | settlement | `setl_000000000292` utr=`300000000292` |
-| bank | `TXN00000292` (HDFC) | credit=Rs 489918.99 value_date=26/08/26 |
+| bank | `TXN00000292` (HDFC) | credit=Rs 17146.00 value_date=16/06/26 |
 
 Narration:
 
 ```
-NEFT-HDFC0004567-HOSUR PHARMACEUTICALS INDIA-300000000292
+NEFT-HDFC0009812-CALICUT HANDICRAFTS LLP-7411523786
 ```
 
 **Arithmetic**
 
 ```
-amount          = 48991899
+amount          = 1714600
 fee             = 0
 tax (18% fee)   = 0
-net             = 48991899 - 0 - 0 = 48991899
-bank credit     = 48991899 paise = Rs 489,918.99
+net             = 1714600 - 0 - 0 = 1714600
+bank credit     = 1714600 = Rs 17,146.00
 match           = True
 ```
 
@@ -112,25 +122,26 @@ match           = True
 
 | file | key | value |
 |---|---|---|
-| invoice_ledger | `INV-2026-000351` | COIMBATORE PACKAGING LLP - Rs 425226.50 |
-| gateway | `pay_000000000351` type=payment | amount=42522650 fee=850453 tax=153082 net=41519115 |
+| invoice_ledger | `INV-2026-000351` | HALDIA ENTERPRISES INDIA PRIVATE LIMITED - Rs 42536.99 |
+| gateway | `pay_000000000351` type=payment | amount=4253699 fee=85074 tax=15313 net=4153312 |
+| gateway | order_receipt | *(empty - must be inferred)* |
 | gateway | settlement | `setl_000000000307` utr=`300000000307` |
-| bank | `TXN00000307` (ICICI) | credit=Rs 415191.15 value_date=29-07-2026 |
+| bank | `TXN00000307` (HDFC) | credit=Rs 41533.12 value_date=08/07/26 |
 
 Narration:
 
 ```
-UPI/8451804905/CPL/coimbatore@paytm
+IMPS-6999383072-HALDIA ENTERPRISES INDIA PRIVATE LIMITED-KKBK
 ```
 
 **Arithmetic**
 
 ```
-amount          = 42522650
-fee             = 850453
-tax (18% fee)   = 153082
-net             = 42522650 - 850453 - 153082 = 41519115
-bank credit     = 41519115 paise = Rs 415,191.15
+amount          = 4253699
+fee             = 85074
+tax (18% fee)   = 15313
+net             = 4253699 - 85074 - 15313 = 4153312
+bank credit     = 4153312 = Rs 41,533.12
 match           = True
 ```
 
@@ -142,25 +153,26 @@ match           = True
 
 | file | key | value |
 |---|---|---|
-| invoice_ledger | `INV-2026-000361` | RAIPUR CERAMICS PVT LTD - Rs 283157.00 |
-| gateway | `pay_000000000361` type=payment | amount=28315700 fee=566314 tax=101937 net=27647449 |
+| invoice_ledger | `INV-2026-000361` | CALICUT CHEMICALS INDIA PRIVATE LIMITED - Rs 43000.99 |
+| gateway | `pay_000000000361` type=payment | amount=4300099 fee=86002 tax=15480 net=4198617 |
+| gateway | order_receipt | *(empty - must be inferred)* |
 | gateway | settlement | `setl_000000000317` utr=`300000000312` |
-| bank | `TXN00000317` (ICICI) | credit=Rs 276474.49 value_date=11-07-2026 |
+| bank | `TXN00000317` (HDFC) | credit=Rs 41986.17 value_date=04/07/26 |
 
 Narration:
 
 ```
-UPI/300000000312/Payment from/raipurcera@apl/SBIN
+IMPS-300000000312-CALICUT CHEMICALS INDIA PRIVATE LIMITED-SBIN
 ```
 
 **Arithmetic**
 
 ```
-amount          = 28315700
-fee             = 566314
-tax (18% fee)   = 101937
-net             = 28315700 - 566314 - 101937 = 27647449
-bank credit     = 27647449 paise = Rs 276,474.49
+amount          = 4300099
+fee             = 86002
+tax (18% fee)   = 15480
+net             = 4300099 - 86002 - 15480 = 4198617
+bank credit     = 4198617 = Rs 41,986.17
 match           = True
 ```
 
@@ -170,15 +182,14 @@ match           = True
 
 > unmatchable bank credit
 
-Bank row `TXN00000367` (ICICI) credits **Rs 492,842.99**, narration:
+Bank row `TXN00000367` (ICICI) credits **Rs 171,461.25**:
 
 ```
-MMT/IMPS/6648951933/BHOPAL GARME/KKBK
+UPI/300000000362/Payment from/anantapura@apl/AXIS
 ```
 
-No invoice and no settlement exist for it. It appears in `truth.csv` with empty
-`invoice_id` and `settlement_id` so `evals/` can distinguish a correct refusal
-from a miss.
+No invoice and no settlement exist for it. Recorded in `truth.csv` with empty
+`invoice_id` and `settlement_id` so `evals/` can tell a correct refusal from a miss.
 
 
 ---
@@ -189,25 +200,26 @@ from a miss.
 
 | file | key | value |
 |---|---|---|
-| invoice_ledger | `INV-2026-000411` | NAGPUR FABRICATORS AND COMPANY - Rs 401165.75 |
-| gateway | `pay_000000000411` type=payment | amount=16046630 fee=0 tax=0 net=16046630 |
+| invoice_ledger | `INV-2026-000411` | RAIPUR AGRO EXPORTS PRIVATE LIMITED - Rs 9561.00 |
+| gateway | `pay_000000000411` type=payment | amount=573660 fee=0 tax=0 net=573660 |
+| gateway | order_receipt | *(empty - must be inferred)* |
 | gateway | settlement | `setl_000000000367` utr=`300000000367` |
-| bank | `TXN00000372` (ICICI) | credit=Rs 160466.30 value_date=19-07-2026 |
+| bank | `TXN00000372` (HDFC) | credit=Rs 5736.60 value_date=06/08/26 |
 
 Narration:
 
 ```
-NEFT/ICICR52023994791/NAGPUR FABRICATORS A
+UPI-RAIPUR AGRO EXPORTS PRIVATE LIMITED-RAIPURAGRO@OKAXIS-2375515329-PAYMENT FROM RAE
 ```
 
 **Arithmetic**
 
 ```
-amount          = 16046630
+amount          = 573660
 fee             = 0
 tax (18% fee)   = 0
-net             = 16046630 - 0 - 0 = 16046630
-bank credit     = 16046630 paise = Rs 160,466.30
+net             = 573660 - 0 - 0 = 573660
+bank credit     = 573660 = Rs 5,736.60
 match           = True
 ```
 
@@ -219,25 +231,26 @@ match           = True
 
 | file | key | value |
 |---|---|---|
-| invoice_ledger | `INV-2026-000441` | SOLAPUR AGRO EXPORTS PRIVATE LIMITED - Rs 404770.25 |
-| gateway | `pay_000000000441` type=payment | amount=40477025 fee=809541 tax=145717 net=39521767 |
-| gateway | `rfnd_000000000001` type=refund | amount=8095405 debit=8095405 net=-8095405 |
+| invoice_ledger | `INV-2026-000441` | ANANTAPUR ENGINEERING PVT LTD - Rs 32871.50 |
+| gateway | `pay_000000000441` type=payment | amount=3287150 fee=65743 tax=11834 net=3209573 |
+| gateway | order_receipt | `INV-2026-000441` |
+| gateway | `rfnd_000000000001` type=refund | amount=821788 debit=821788 |
 | gateway | settlement | `setl_000000000397` utr=`300000000397` |
-| bank | `TXN00000402` (ICICI) | credit=Rs 314263.62 value_date=07-08-2026 |
+| bank | `TXN00000402` (ICICI) | credit=Rs 23877.85 value_date=23-07-2026 |
 
 Narration:
 
 ```
-NEFT/ICICR52023081808/SOLAPUR AGRO EXPORTS PRIVATE LIMITED
+UPI/8371433567/Payment from/anantapure@okhdfcbank/KKBK
 ```
 
 **Arithmetic**
 
 ```
-payment net     = 39521767
-refund  amount  = 8095405   (type=refund, carries a debit)
-expected credit = 39521767 - 8095405 = 31426362 paise = Rs 314,263.62
-bank credit     = 31426362 paise
+payment net     = 3209573
+refund amount   = 821788   (type=refund, carries a debit)
+expected credit = 3209573 - 821788 = 2387785 paise = Rs 23,877.85
+bank credit     = 2387785
 match           = True
 ```
 
@@ -245,27 +258,28 @@ match           = True
 
 ## `rounding_drift`
 
-> -2 paise discrepancy
+> +2 paise discrepancy
 
 | file | key | value |
 |---|---|---|
-| invoice_ledger | `INV-2026-000461` | JALANDHAR MEDIA PVT LTD - Rs 438807.00 |
-| gateway | `pay_000000000461` type=payment | amount=43880700 fee=0 tax=0 net=43880700 |
+| invoice_ledger | `INV-2026-000461` | HOSUR AGRO EXPORTS PRIVATE LIMITED - Rs 25000.00 |
+| gateway | `pay_000000000461` type=payment | amount=2500000 fee=0 tax=0 net=2500000 |
+| gateway | order_receipt | `INV-2026-000461` |
 | gateway | settlement | `setl_000000000417` utr=`300000000417` |
-| bank | `TXN00000422` (ICICI) | credit=Rs 438806.98 value_date=17-07-2026 |
+| bank | `TXN00000422` (HDFC) | credit=Rs 25000.02 value_date=26/07/26 |
 
 Narration:
 
 ```
-UPI/300000000417/JMP/jalandharm@ybl
+NEFT CR-HDFC0000123-HOSUR AGRO EXPORTS-UTR9904738795
 ```
 
 **Arithmetic**
 
 ```
-expected credit = 43880700 paise
-bank credit     = 43880698 paise
-drift           = -2 paise   <- deliberately injected and labelled
+expected credit = 2500000
+bank credit     = 2500002
+drift           = +2 paise   <- deliberately injected and labelled
 ```
 
 ---
@@ -276,24 +290,25 @@ drift           = -2 paise   <- deliberately injected and labelled
 
 | file | key | value |
 |---|---|---|
-| invoice_ledger | `INV-2026-000471` | BHAVNAGAR LOGISTICS PRIVATE LIMITED - Rs 81932.00 |
-| invoice_ledger | TDS | section 194Q |
-| gateway | `pay_000000000471` type=payment | amount=8185007 fee=0 tax=0 net=8185007 |
+| invoice_ledger | `INV-2026-000471` | CUTTACK LOGISTICS PRIVATE LIMITED - Rs 41360.00 |
+| invoice_ledger | TDS | section 194C |
+| gateway | `pay_000000000471` type=payment | amount=4053280 fee=0 tax=0 net=4053280 |
+| gateway | order_receipt | `INV-2026-000471` |
 | gateway | settlement | `setl_000000000427` utr=`300000000427` |
-| bank | `TXN00000432` (ICICI) | credit=Rs 81850.07 value_date=08-06-2026 |
+| bank | `TXN00000432` (ICICI) | credit=Rs 40532.80 value_date=24-08-2026 |
 
 Narration:
 
 ```
-BIL/ONL/300000000427/BLP
+MMT/IMPS/300000000427/CUTTACK LOGISTIC/ICIC
 ```
 
 **Arithmetic**
 
 ```
-invoice gross   = 8193200 paise = Rs 81,932.00
-TDS 194Q        = 8193 paise = Rs 81.93  (0.1%)
-captured        = 8185007 paise = Rs 81,850.07
-bank credit     = 8185007 paise
+invoice gross   = 4136000 = Rs 41,360.00
+TDS 194C        = 82720 = Rs 827.20  (2.0%)
+captured        = 4053280 = Rs 40,532.80
+bank credit     = 4053280
 match           = True
 ```

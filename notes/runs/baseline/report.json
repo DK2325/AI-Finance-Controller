@@ -4,32 +4,32 @@
     "held_out": {},
     "seen": {
       "batched_settlement": {
-        "matched": 336,
-        "missed": 322,
+        "matched": 99,
+        "missed": 560,
         "refused": 0,
-        "total": 658
+        "total": 659
       },
       "clean": {
-        "matched": 1530,
-        "missed": 1493,
+        "matched": 609,
+        "missed": 2413,
         "refused": 0,
-        "total": 3023
+        "total": 3022
       },
       "date_skew": {
-        "matched": 86,
-        "missed": 79,
+        "matched": 35,
+        "missed": 130,
         "refused": 0,
         "total": 165
       },
       "duplicate_utr": {
-        "matched": 55,
-        "missed": 55,
+        "matched": 22,
+        "missed": 88,
         "refused": 0,
         "total": 110
       },
       "fee_deducted": {
-        "matched": 276,
-        "missed": 273,
+        "matched": 97,
+        "missed": 452,
         "refused": 0,
         "total": 549
       },
@@ -40,14 +40,14 @@
         "total": 55
       },
       "partial_payment": {
-        "matched": 166,
-        "missed": 164,
+        "matched": 62,
+        "missed": 268,
         "refused": 0,
         "total": 330
       },
       "rounding_drift": {
-        "matched": 53,
-        "missed": 57,
+        "matched": 12,
+        "missed": 98,
         "refused": 0,
         "total": 110
       }
@@ -58,48 +58,48 @@
     "n_points": 2,
     "points": [
       {
-        "coverage": 0.48412537917087967,
-        "money_error_ratio": 0.0,
-        "money_weighted_precision": 1.0,
-        "n_false_positives": 0,
-        "n_predicted": 2394,
-        "n_true_positives": 2394,
+        "coverage": 0.46430738119312437,
+        "money_error_ratio": 0.31720825371198336,
+        "money_weighted_precision": 0.3614618020011595,
+        "n_false_positives": 1394,
+        "n_predicted": 2296,
+        "n_true_positives": 902,
         "orphan_refusal_rate": 1.0,
-        "precision": 1.0,
-        "recall": 0.48412537917087967,
+        "precision": 0.39285714285714285,
+        "recall": 0.18240647118301315,
         "threshold": 1.0
       },
       {
-        "coverage": 0.5170879676440849,
-        "money_error_ratio": 0.010762486611944552,
-        "money_weighted_precision": 0.9791559302207531,
-        "n_false_positives": 55,
-        "n_predicted": 2557,
-        "n_true_positives": 2502,
+        "coverage": 0.49868554095045503,
+        "money_error_ratio": 0.3450089370412559,
+        "money_weighted_precision": 0.35039888618529735,
+        "n_false_positives": 1530,
+        "n_predicted": 2466,
+        "n_true_positives": 936,
         "orphan_refusal_rate": 1.0,
-        "precision": 0.9784904184591318,
-        "recall": 0.5059656218402426,
+        "precision": 0.3795620437956204,
+        "recall": 0.18928210313447927,
         "threshold": 0.7
       }
     ]
   },
   "run_id": "baseline-train",
   "score": {
-    "coverage": 0.5170879676440849,
-    "matched_money": 63955026927,
-    "money_error_ratio": 0.010762486611944552,
-    "money_weighted_precision": 0.9791559302207531,
+    "coverage": 0.49868554095045503,
+    "matched_money": 20997345380,
+    "money_error_ratio": 0.3450089370412559,
+    "money_weighted_precision": 0.35039888618529735,
     "n_decidable": 4945,
-    "n_false_positives": 55,
+    "n_false_positives": 1530,
     "n_orphans": 55,
     "n_orphans_refused": 55,
-    "n_predicted": 2557,
-    "n_true_positives": 2502,
+    "n_predicted": 2466,
+    "n_true_positives": 936,
     "orphan_refusal_rate": 1.0,
-    "precision": 0.9784904184591318,
-    "recall": 0.5059656218402426,
+    "precision": 0.3795620437956204,
+    "recall": 0.18928210313447927,
     "threshold": 0.0,
-    "total_money": 123863851549,
-    "wrong_money": 1333083044
+    "total_money": 39534914843,
+    "wrong_money": 13639898946
   }
 }

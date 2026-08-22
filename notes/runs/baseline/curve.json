@@ -3,27 +3,27 @@
   "n_points": 2,
   "points": [
     {
-      "coverage": 0.48412537917087967,
-      "money_error_ratio": 0.0,
-      "money_weighted_precision": 1.0,
-      "n_false_positives": 0,
-      "n_predicted": 2394,
-      "n_true_positives": 2394,
+      "coverage": 0.46430738119312437,
+      "money_error_ratio": 0.31720825371198336,
+      "money_weighted_precision": 0.3614618020011595,
+      "n_false_positives": 1394,
+      "n_predicted": 2296,
+      "n_true_positives": 902,
       "orphan_refusal_rate": 1.0,
-      "precision": 1.0,
-      "recall": 0.48412537917087967,
+      "precision": 0.39285714285714285,
+      "recall": 0.18240647118301315,
       "threshold": 1.0
     },
     {
-      "coverage": 0.5170879676440849,
-      "money_error_ratio": 0.010762486611944552,
-      "money_weighted_precision": 0.9791559302207531,
-      "n_false_positives": 55,
-      "n_predicted": 2557,
-      "n_true_positives": 2502,
+      "coverage": 0.49868554095045503,
+      "money_error_ratio": 0.3450089370412559,
+      "money_weighted_precision": 0.35039888618529735,
+      "n_false_positives": 1530,
+      "n_predicted": 2466,
+      "n_true_positives": 936,
       "orphan_refusal_rate": 1.0,
-      "precision": 0.9784904184591318,
-      "recall": 0.5059656218402426,
+      "precision": 0.3795620437956204,
+      "recall": 0.18928210313447927,
       "threshold": 0.7
     }
   ]
