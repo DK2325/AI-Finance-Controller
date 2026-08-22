@@ -11,23 +11,49 @@ softened.
 
 ## Known limitations of the synthetic data
 
-### Invoice amounts are uniform, not log-normal
+### `order_receipt` is populated on only ~38% of gateway rows
 
-`datagen/cases.py` draws invoice values uniformly over Rs 1,000–5,00,000. Real B2B
-invoice values are roughly log-normal, with heavy clustering on round numbers
-(Rs 50,000, Rs 1,00,000) and a long tail of large contracts.
+**This is a modelling judgement, not a measured figure.** It is stated plainly here
+because a panelist will ask, and the honest answer is that it is an assumption with a
+rationale rather than a citation.
 
-**Effect:** amount-band blocking in Phase 3 is easier here than in production. Real data
-piles many invoices onto identical round amounts, so an amount bucket narrows the
-candidate set less than it does here, and the subset-sum search for batched settlements
-faces more collisions.
+**The rationale.** Razorpay's `receipt` and `notes` fields are merchant-populated and
+optional ([settlement recon
+report](https://razorpay.com/docs/api/settlements/fetch-recon/)). A checkout integration
+that creates an order without setting a receipt produces a settlement row with nothing on
+it linking back to the merchant's own invoice. Anecdotally that is common, particularly
+for merchants who integrated quickly; 38% is chosen as "a substantial minority populate
+it", not derived from data we have.
 
-**Why it was not fixed:** unlike the counterparty pool, this does not feed a named model
-feature — it affects blocking efficiency, which is reported as measured throughput rather
-than as an accuracy claim. Deliberately left as-is and disclosed.
+**Why it matters more than it looks.** The first generator populated this field on 100%
+of rows, which meant the invoice-to-settlement link was *given* rather than inferred.
+Every difficulty that lives in the relationship between an invoice and its credit --
+TDS, gateway fee, partial payment -- was therefore never exercised: the matcher only had
+to link a settlement to a bank transaction, and could read the invoice off the row.
+Measured effect of that mistake: **98.99% match rate with rules alone**, no residual for
+the classifier, and a Phase 7 risk-coverage curve that would have been flat.
 
-**What would fix it:** sample from a log-normal fitted to published invoice-value
-distributions, with an explicit round-number mass. Roughly an hour, plus a regeneration.
+After the change the matcher must reconstruct the link through the bank narration, which
+is the only place a counterparty name appears. Match rate on `data/train` fell to 76.5%,
+inside the intended 70-85% band.
+
+**What would strengthen the claim.** A distribution measured from real anonymised
+settlement exports, or a statement from a payments engineer about how often the field is
+set in practice. Neither was available. If the true figure is much higher than 38%, this
+system is being tested against harder data than reality -- which is the safe direction to
+be wrong in, but it is still being wrong.
+
+### Invoice amounts are log-normal, but the parameters are invented
+
+Amounts are drawn log-normal (mu 10.4, sigma 1.05 in log-rupees) with 38% forced onto
+round values -- Rs 25,000, Rs 1,00,000 and similar. The *shape* is right: real B2B
+invoice values are log-normal and cluster hard on round numbers. The *parameters* are
+chosen to look plausible, not fitted to anything.
+
+This matters because it directly controls how often two invoices share an amount, which
+is the main source of genuine ambiguity in the data. At the current settings 22% of
+payouts share their value with another payout. Set sigma higher and matching gets easier;
+lower and it gets harder. Nothing pins the value down but judgement.
 
 ### Each case type isolates its own signal
 

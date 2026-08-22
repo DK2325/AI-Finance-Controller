@@ -22,6 +22,7 @@ from rapidfuzz import fuzz
 
 from core.blocking import Candidate, generate_candidates
 from core.features import counterparty_frequencies, extract
+from core.invoices import InvoiceLink, resolve_invoices
 from core.records import BankTxn, Invoice, Settlement, Sources
 from core.rules import RuleHit, apply_rules, date_penalty, subset_sum_hit
 from core.subsetsum import REASON_CAPPED, SubsetSumStats, search_bucket
@@ -241,8 +242,21 @@ def reconcile(batch_dir: Path | str, with_features: bool = True) -> ReconResult:
     batched = _subset_sum_pass(sources, claimed, subset_stats)
     timing.record("subset_sum", time.perf_counter() - start)
 
+    # Invoice inference. Only ~38% of gateway rows carry order_receipt, so for the rest
+    # the invoice link is reconstructed through the bank narration. A settlement that
+    # matched no transaction cannot have its invoice inferred either -- correctly, since
+    # there is no evidence left to do it with.
+    start = time.perf_counter()
+    pairs = [(c.settlement, c.txn, h.score) for c, h, _ in accepted]
+    pairs += [(s_, t, 0.8) for s_, t in batched]
+    invoice_links = resolve_invoices(pairs, sources)
+    timing.record("invoice_link", time.perf_counter() - start)
+
     frequencies = counterparty_frequencies(sources)
     invoice_by_id = sources.invoice_by_id
+
+    def _linked(settlement) -> InvoiceLink | None:
+        return invoice_links.get(settlement.entity_id)
 
     start = time.perf_counter()
     matches: list[Match] = []
@@ -259,13 +273,21 @@ def reconcile(batch_dir: Path | str, with_features: bool = True) -> ReconResult:
             if with_features
             else {}
         )
+        link = _linked(candidate.settlement)
+        if link is None:
+            # Matched a transaction but no invoice can be identified. That is an
+            # exception, not a match -- emitting a triple with an empty invoice would be
+            # a false auto-match with money attached.
+            continue
         matches.append(
             Match(
-                invoice_id=candidate.settlement.invoice_id,
+                invoice_id=link.invoice_id,
                 settlement_id=candidate.settlement.settlement_id,
                 txn_id=candidate.txn.txn_id,
-                score=hit.score,
-                rule=hit.rule,
+                # Both links must be right for the triple to be right, so the two
+                # uncertainties compound rather than the stronger one masking the weaker.
+                score=round(hit.score * link.score, 4),
+                rule=f"{hit.rule}+{link.rule}",
                 layer=hit.layer,
                 features=features,
             )
@@ -273,7 +295,8 @@ def reconcile(batch_dir: Path | str, with_features: bool = True) -> ReconResult:
 
     batch_hit = subset_sum_hit()
     for settlement, txn in batched:
-        invoice = invoice_by_id.get(settlement.invoice_id)
+        provisional = _linked(settlement)
+        invoice = invoice_by_id.get(provisional.invoice_id) if provisional else None
         counterparty = invoice.counterparty if invoice else ""
         features = (
             extract(
@@ -287,13 +310,16 @@ def reconcile(batch_dir: Path | str, with_features: bool = True) -> ReconResult:
             if with_features
             else {}
         )
+        link = _linked(settlement)
+        if link is None:
+            continue
         matches.append(
             Match(
-                invoice_id=settlement.invoice_id,
+                invoice_id=link.invoice_id,
                 settlement_id=settlement.settlement_id,
                 txn_id=txn.txn_id,
-                score=batch_hit.score,
-                rule=batch_hit.rule,
+                score=round(batch_hit.score * link.score, 4),
+                rule=f"{batch_hit.rule}+{link.rule}",
                 layer=batch_hit.layer,
                 features=features,
             )

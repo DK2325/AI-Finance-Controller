@@ -88,13 +88,43 @@ def test_baseline_scores_plausibly_low() -> None:
     batch = load_batch("data/train")
     score = score_at(predictions, batch)
 
+    # Bounds rechecked after the Phase 3 data rework. Measured: coverage 49.87%,
+    # precision 37.96%.
     assert 0.30 < score.coverage < 0.75, (
         f"coverage {score.coverage:.2%} is not plausible for exact-UTR-only"
     )
-    assert score.precision < 0.995, (
-        f"precision {score.precision:.4%} is too high - duplicate_utr cases must cost it"
+
+    # Precision is now low for a specific, checkable reason: the baseline reads the
+    # invoice off order_receipt and never infers it, so it is wrong on roughly the ~62%
+    # of gateway rows where that field is empty. A lower bound is asserted as well as an
+    # upper one -- a collapse to near-zero would mean the baseline broke, not that the
+    # data got harder, and the two must not look the same.
+    assert 0.25 < score.precision < 0.90, (
+        f"precision {score.precision:.2%} is outside the band explainable by "
+        "order_receipt being sparsely populated"
     )
     assert score.n_false_positives > 0, "a UTR-only matcher must fail on reused UTRs"
+
+
+def test_the_real_matcher_beats_the_baseline_decisively() -> None:
+    """The floor exists to be cleared. If core/ ever stops clearing it, something broke."""
+    from core.pipeline import reconcile
+    from evals.models import Prediction, Triple
+
+    batch = load_batch("data/train")
+    baseline_score = score_at(run_baseline("data/train"), batch)
+
+    result = reconcile("data/train")
+    real = score_at(
+        [
+            Prediction(Triple(m.invoice_id, m.settlement_id, m.txn_id), m.score, m.layer)
+            for m in result.matches
+        ],
+        batch,
+    )
+
+    assert real.precision > baseline_score.precision + 0.30
+    assert real.recall > baseline_score.recall + 0.30
 
 
 def test_baseline_refuses_every_orphan() -> None:

@@ -27,6 +27,7 @@ Every function here is pure.
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -115,6 +116,26 @@ def plausible_credits(settlement: Settlement) -> set[int]:
 
 NAME_PREFIX_LEN = 6
 
+# Pass D keys on (counterparty, day, amount band), not (counterparty, day).
+#
+# Once counterparty selection became realistically skewed -- a merchant bills a few
+# customers constantly -- a counterparty+day bucket held dozens of rows and candidate
+# growth went straight back to quadratic (exponent 1.97 measured at 5k vs 25k).
+#
+# Bands are multiplicative because the differences that matter here are proportional: a
+# gateway fee shifts a payout ~2.4% and TDS up to 10%. A settlement is indexed into its
+# own band and the two below, which covers any known deduction while still splitting a
+# dense bucket by order of magnitude.
+AMOUNT_BAND_RATIO = 1.15
+AMOUNT_BAND_SPREAD = 2
+
+
+def amount_band(paise: int) -> int:
+    """Multiplicative band index. Monotone, so band(x) <= band(y) whenever x <= y."""
+    if paise <= 0:
+        return 0
+    return int(math.log(paise) / math.log(AMOUNT_BAND_RATIO))
+
 
 def _narration_keys(txn: BankTxn) -> set[str]:
     """Counterparty keys a narration could be carrying.
@@ -133,12 +154,31 @@ def _narration_keys(txn: BankTxn) -> set[str]:
     return out
 
 
-def _index_bank_by_amount(bank: list[BankTxn]) -> dict[int, list[BankTxn]]:
-    index: dict[int, list[BankTxn]] = defaultdict(list)
+def _index_bank_by_amount(bank: list[BankTxn]) -> dict[tuple[int, int], list[BankTxn]]:
+    """Bank rows keyed by (credit, day) -- amount ALONE is not a blocking key.
+
+    Once invoice values cluster on round numbers, an exact-amount key matches every
+    transaction of that value anywhere in the batch. The bucket therefore grows linearly
+    with the batch and the pass becomes quadratic: measured at 4.88 candidates per
+    settlement over 5,000 rows and 19.93 over 25,000, purely from the batch being longer.
+
+    Pairing the amount with the day bounds the bucket to what a real pair could occupy,
+    since a settlement and its credit are at most three days apart.
+    """
+    index: dict[tuple[int, int], list[BankTxn]] = defaultdict(list)
     for txn in bank:
-        if txn.credit > 0:
-            index[txn.credit].append(txn)
+        if txn.credit > 0 and txn.value_date is not None:
+            index[(txn.credit, txn.value_date.toordinal())].append(txn)
     return index
+
+
+def _lookup_amount(
+    index: dict[tuple[int, int], list[BankTxn]], amount: int, days: list[int]
+) -> list[BankTxn]:
+    out: list[BankTxn] = []
+    for ordinal in days:
+        out.extend(index.get((amount, ordinal), ()))
+    return out
 
 
 def generate_candidates(sources: Sources) -> tuple[list[Candidate], BlockingStats]:
@@ -164,13 +204,14 @@ def generate_candidates(sources: Sources) -> tuple[list[Candidate], BlockingStat
     # makes the lookup O(1). Six characters survives the truncation, case loss and
     # separator loss that bank statements inflict, because all of those keep the start of
     # the name intact.
-    by_name_day: dict[tuple[str, int], list[BankTxn]] = defaultdict(list)
+    by_name_day: dict[tuple[str, int, int], list[BankTxn]] = defaultdict(list)
     for txn in bank:
         if txn.value_date is None or txn.credit <= 0:
             continue
         ordinal = txn.value_date.toordinal()
+        band = amount_band(txn.credit)
         for key in _narration_keys(txn):
-            by_name_day[(key, ordinal)].append(txn)
+            by_name_day[(key, ordinal, band)].append(txn)
 
     invoice_by_id = sources.invoice_by_id
     hits: dict[tuple[str, str], set[str]] = defaultdict(set)
@@ -184,18 +225,20 @@ def generate_candidates(sources: Sources) -> tuple[list[Candidate], BlockingStat
         per_pass[pass_name] += 1
 
     for settlement in payments:
-        # Pass A -- the UTR is printed in the narration.
+        # Pass A -- the UTR is printed in the narration. Unique enough to need no date.
         for txn in by_utr.get(settlement.utr, ()):
             record(settlement, txn, PASS_UTR)
 
-        # Pass B -- the credit is exactly the reported payout.
-        for txn in by_amount.get(settlement.net_amount, ()):
+        days = day_bucket(settlement.settled_date, DATE_WINDOW_DAYS)
+
+        # Pass B -- the credit is exactly the reported payout, within the date window.
+        for txn in _lookup_amount(by_amount, settlement.net_amount, days):
             record(settlement, txn, PASS_EXACT_AMOUNT)
 
         # Pass C -- the difference is explainable by a known deduction structure.
         for target in plausible_credits(settlement):
             for offset in range(-PAISE_TOLERANCE, PAISE_TOLERANCE + 1):
-                for txn in by_amount.get(target + offset, ()):
+                for txn in _lookup_amount(by_amount, target + offset, days):
                     record(settlement, txn, PASS_RATE_AMOUNT)
 
         # Pass D -- same counterparty, near enough in time. The only pass that can reach
@@ -206,9 +249,12 @@ def generate_candidates(sources: Sources) -> tuple[list[Candidate], BlockingStat
         key = counterparty_key(invoice.customer_name)
         if not key:
             continue
+        base_band = amount_band(settlement.net_amount)
+        bands = range(base_band - AMOUNT_BAND_SPREAD, base_band + 1)
         for ordinal in day_bucket(settlement.settled_date, DATE_WINDOW_DAYS):
-            for txn in by_name_day.get((key, ordinal), ()):
-                record(settlement, txn, PASS_COUNTERPARTY)
+            for band in bands:
+                for txn in by_name_day.get((key, ordinal, band), ()):
+                    record(settlement, txn, PASS_COUNTERPARTY)
 
     candidates = [
         Candidate(

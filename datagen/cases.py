@@ -16,6 +16,7 @@ a miss.
 
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
@@ -36,6 +37,18 @@ from datagen.schemas import (
 
 BASE_DATE = date(2026, 6, 1)
 DATE_SPAN_DAYS = 90
+
+# Share of gateway rows carrying the merchant's own reference in order_receipt.
+#
+# Razorpay's `receipt` / `notes` fields are merchant-populated and optional, and in
+# practice many integrations never set them -- a checkout that posts an order without a
+# receipt produces a settlement row with nothing linking it back to the invoice.
+#
+# 38% is a judgement call, not a measured figure; see notes/failure-modes.md. What it
+# buys is that most invoice<->settlement links must be INFERRED from amount, date and
+# counterparty rather than read off the row. With it at 100% the matcher scored 98.99%
+# with rules alone and there was no residual for the classifier to work on.
+ORDER_RECEIPT_POPULATED = 0.38
 
 
 @dataclass
@@ -103,12 +116,48 @@ class Ctx:
         return BASE_DATE + timedelta(days=self.rng.randrange(DATE_SPAN_DAYS))
 
     def customer(self) -> str:
-        return self.rng.choice(CUSTOMERS)
+        """Skewed toward frequent counterparties, not uniform over the pool.
+
+        A real merchant bills a handful of customers repeatedly and a long tail once.
+        Uniform selection over 2,000 names made same-counterparty-same-day collisions
+        vanishingly rare, which flattered blocking: the counterparty bucket was almost
+        always a single row.
+        """
+        index = int(len(CUSTOMERS) * (self.rng.random() ** 2.5))
+        return CUSTOMERS[min(index, len(CUSTOMERS) - 1)]
 
     def amount(self) -> int:
-        """A plausible B2B invoice amount in paise, Rs 1,000 to Rs 5,00,000."""
-        rupee_value = self.rng.randrange(1_000, 500_000)
-        paise = self.rng.choice([0, 0, 0, 50, 25, 75, 99])
+        """A plausible B2B invoice amount in paise: log-normal, clustered on round values.
+
+        The first generator drew uniformly over Rs 1,000-5,00,000, which made 99.92% of
+        amounts distinct -- an exact amount match became a primary key and the matcher
+        scored 98.99% with rules alone. Real B2B invoice values are log-normal and pile
+        onto round numbers, so amounts collide constantly and an amount match is evidence
+        rather than proof.
+
+        Box-Muller is written out rather than calling rng.gauss(), whose implementation is
+        not guaranteed stable across Python versions -- and determinism is a committed
+        hash here.
+        """
+        roll = self.rng.random()
+
+        if roll < 0.22:
+            # Round "quote" amounts: the values a salesperson actually writes down.
+            rupee_value = self.rng.choice(
+                [5_000, 10_000, 15_000, 20_000, 25_000, 30_000, 40_000, 50_000,
+                 60_000, 75_000, 100_000, 125_000, 150_000, 200_000, 250_000, 500_000]
+            )
+        elif roll < 0.38:
+            # Round thousands.
+            rupee_value = self.rng.randrange(1, 301) * 1_000
+        else:
+            u1 = max(self.rng.random(), 1e-12)
+            u2 = self.rng.random()
+            z = math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
+            rupee_value = int(math.exp(10.4 + 1.05 * z))
+            rupee_value = max(1_000, min(rupee_value, 2_000_000))
+
+        paise = 0 if self.rng.random() < 0.72 else self.rng.choice([25, 50, 75, 99])
         return rupee_value * 100 + paise
 
     def credit_bank(self, amount: int) -> int:
@@ -140,6 +189,11 @@ def _invoice_row(
         "tds_section": tds_section or "",
         "status": status,
     }
+
+
+def _receipt(ctx: Ctx, invoice_id: str) -> str:
+    """The merchant reference, present only sometimes. See ORDER_RECEIPT_POPULATED."""
+    return invoice_id if ctx.rng.random() < ORDER_RECEIPT_POPULATED else ""
 
 
 def _gateway_row(
@@ -260,7 +314,7 @@ def _simple_case(
                 txn_type=TYPE_PAYMENT,
                 payment_id=payment_id,
                 order_id=ctx.order_id(),
-                order_receipt=invoice_id,
+                order_receipt=_receipt(ctx, invoice_id),
                 settlement_id=settlement_id,
                 utr=utr,
                 amount=captured,
@@ -347,7 +401,7 @@ def batched_settlement(ctx: Ctx, remaining: int = 5) -> Emission:
                 txn_type=TYPE_PAYMENT,
                 payment_id=payment_id,
                 order_id=ctx.order_id(),
-                order_receipt=invoice_id,
+                order_receipt=_receipt(ctx, invoice_id),
                 settlement_id=settlement_id,
                 utr=utr,
                 amount=gross,
@@ -390,6 +444,9 @@ def refund_netted(ctx: Ctx, remaining: int = 1) -> Emission:
 
     method = ctx.rng.choice(METHODS)
     order_id = ctx.order_id()
+    # Both rows come from the same order, so they carry the same receipt state. Rolling
+    # independently would let a refund name an invoice its own payment does not.
+    receipt = _receipt(ctx, invoice_id)
 
     return Emission(
         invoices=[_invoice_row(ctx, invoice_id, customer, gross, invoice_date)],
@@ -399,7 +456,7 @@ def refund_netted(ctx: Ctx, remaining: int = 1) -> Emission:
                 txn_type=TYPE_PAYMENT,
                 payment_id=payment_id,
                 order_id=order_id,
-                order_receipt=invoice_id,
+                order_receipt=receipt,
                 settlement_id=settlement_id,
                 utr=utr,
                 amount=gross,
@@ -414,7 +471,7 @@ def refund_netted(ctx: Ctx, remaining: int = 1) -> Emission:
                 txn_type=TYPE_REFUND,
                 payment_id=payment_id,
                 order_id=order_id,
-                order_receipt=invoice_id,
+                order_receipt=receipt,
                 settlement_id=settlement_id,
                 utr=utr,
                 amount=refund,
@@ -460,7 +517,7 @@ def duplicate_utr(ctx: Ctx, remaining: int = 1) -> Emission:
                 txn_type=TYPE_PAYMENT,
                 payment_id=payment_id,
                 order_id=ctx.order_id(),
-                order_receipt=invoice_id,
+                order_receipt=_receipt(ctx, invoice_id),
                 settlement_id=settlement_id,
                 utr=utr,
                 amount=gross,

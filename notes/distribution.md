@@ -99,3 +99,36 @@ Rs 1,000-5,00,000 where real B2B values are log-normal with round-number cluster
 makes amount-band blocking slightly easier than reality. Recorded in
 `notes/failure-modes.md` rather than fixed, because unlike the counterparty pool it does
 not feed a named model feature.
+
+---
+
+## Generator rework, 23 Aug 2026 — the data was too easy
+
+Phase 3 measured a **98.99% match rate with rules alone** against a ~75% target. That is
+not a good matcher; it is data with the answer written on the front, and it would have
+left Phase 4's classifier nothing to learn and Phase 7's risk-coverage curve flat.
+
+Three measured causes, all in the generator:
+
+| | Before | After |
+|---|---|---|
+| `order_receipt` populated | 100% | **37.7%** |
+| Distinct `net_amount` values | 99.92% | **77.7%** |
+| Invoice amounts on a round Rs 1,000 | 0.02% | **26.4%** |
+| Counterparty selection | uniform over 2,000 | **skewed**, top appears 224x |
+
+The first is the one that mattered. With `order_receipt` on every row the invoice link was
+*given*, so every difficulty living in the invoice-versus-credit relationship — TDS,
+gateway fee, partial payment — was never exercised. The matcher only had to link a
+settlement to a bank transaction.
+
+The other two remove amount as a primary key. With 99.92% of payouts distinct, an exact
+amount match settled the question; at 77.7% it is evidence that narrows the field.
+
+**Measured effect on the Phase 3 matcher:** 98.99% -> **76.5%** coverage at 98.7%
+precision, inside the intended 70-85% band, with a real per-case-type spread (32.7% on
+`rounding_drift` to 81.8% on `duplicate_utr`) rather than a flat 100%.
+
+`data/test` was regenerated with the same changes, in its own commit. Nothing had been
+learned from it, so this was safe then and impossible later — train and test drawn from
+different distributions would have made every Phase 7 number meaningless.
