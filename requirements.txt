@@ -1,0 +1,38 @@
+# LedgerLoop runtime dependencies (Python 3.12)
+
+# CLI
+typer>=0.12
+rich>=13.7
+
+# data
+pandas>=2.2
+polars>=1.0
+rapidfuzz>=3.9
+
+# model + calibration
+scikit-learn>=1.5
+lightgbm>=4.4
+numpy>=1.26
+
+# charts (reliability diagram, risk-coverage curve)
+matplotlib>=3.9
+
+# schemas
+pydantic>=2.8
+pydantic-settings>=2.4
+
+# api
+fastapi>=0.112
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+
+# database
+sqlalchemy>=2.0
+alembic>=1.13
+psycopg[binary]>=3.2
+
+# llm (unused until Phase 5; --mock-llm works without a key)
+anthropic>=0.40
+
+# config
+python-dotenv>=1.0
