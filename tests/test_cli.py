@@ -40,11 +40,21 @@ def test_recon_accepts_mock_llm_without_an_api_key(tmp_path) -> None:
     assert result.exit_code == 0
 
 
-def test_eval_and_chaos_accept_a_run_id() -> None:
-    assert runner.invoke(app, ["eval", "--run", "abc123"]).exit_code == 0
+def test_chaos_accepts_a_run_id() -> None:
+    """Still a Phase 6 no-op; it must at least parse its documented flags."""
     assert runner.invoke(
         app, ["chaos", "--run", "abc123", "--corruption", "unseen_narration"]
     ).exit_code == 0
+
+
+def test_eval_fails_cleanly_on_an_unknown_run() -> None:
+    """eval does real work from Phase 2, so a missing run must be an error, not a no-op.
+
+    Exit code 2 with a message naming the available runs, rather than a traceback.
+    """
+    result = runner.invoke(app, ["eval", "--run", "no-such-run-exists", "--no-readme"])
+    assert result.exit_code == 2
+    assert "no run" in result.output.lower() or "no run" in str(result.stderr).lower()
 
 
 def test_difficulty_rejects_an_unknown_value(tmp_path) -> None:

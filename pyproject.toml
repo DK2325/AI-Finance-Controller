@@ -54,3 +54,8 @@ addopts = "-q"
 # typer.Option(...) in an argument default is Typer's documented idiom, not the mutable
 # default B008 exists to catch. Scoped to the CLI so the rule stays live everywhere else.
 "ledgerloop/cli.py" = ["B008"]
+
+[tool.ruff.lint.isort]
+# `astutil` is a test-local helper, not a third-party package. Without this, ruff sorts
+# it into the third-party block and then reports the result as unsorted.
+known-first-party = ["astutil", "datagen", "core", "model", "llm", "api", "evals", "ledgerloop"]

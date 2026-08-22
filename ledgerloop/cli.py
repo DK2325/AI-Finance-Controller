@@ -79,10 +79,45 @@ def recon(
 @app.command(name="eval")
 def eval_(
     run: str = typer.Option(..., "--run", help="RUN_ID to score."),
+    threshold: float = typer.Option(0.0, "--threshold", help="Operating point to report at."),
+    baseline_from: Path | None = typer.Option(
+        None,
+        "--baseline-from",
+        help="Create the exact-UTR-only baseline run over this batch first, then score it.",
+    ),
+    no_readme: bool = typer.Option(False, "--no-readme", help="Skip the README table rewrite."),
 ) -> None:
     """Score a run against ground truth and regenerate the README metrics table."""
-    typer.echo(_NOT_YET.format(phase=2))
-    typer.echo(f"  would score run {run}")
+    from evals.harness import evaluate, make_baseline_run
+
+    if baseline_from is not None:
+        made = make_baseline_run(baseline_from, run_id=run)
+        typer.echo(
+            f"baseline run '{run}' over {baseline_from}: {len(made.predictions)} predictions"
+        )
+
+    try:
+        report = evaluate(
+            run_id=run,
+            threshold=threshold,
+            readme=None if no_readme else Path("README.md"),
+        )
+    except FileNotFoundError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    s = report["score"]
+    typer.echo(f"\nrun {run}  batch {report['batch_dir']}  threshold {threshold}")
+    typer.echo(f"  coverage                 {s['coverage']:.2%}")
+    typer.echo(f"  precision                {s['precision']:.2%}")
+    typer.echo(f"  recall                   {s['recall']:.2%}")
+    typer.echo(f"  money-weighted precision {s['money_weighted_precision']:.4%}")
+    typer.echo(f"  money error ratio        {s['money_error_ratio']:.4%}")
+    typer.echo(f"  orphan refusal rate      {s['orphan_refusal_rate']:.2%}")
+    typer.echo(f"  false auto-matches       {s['n_false_positives']}")
+    degenerate = " (degenerate)" if report["curve"]["is_degenerate"] else ""
+    typer.echo(f"  curve points             {report['curve']['n_points']}{degenerate}")
+    typer.echo(f"\n  written to runs/{run}/")
 
 
 @app.command()

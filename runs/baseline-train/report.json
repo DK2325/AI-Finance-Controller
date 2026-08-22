@@ -1,0 +1,105 @@
+{
+  "batch_dir": "data/train",
+  "confusion_by_case_type": {
+    "held_out": {},
+    "seen": {
+      "batched_settlement": {
+        "matched": 336,
+        "missed": 322,
+        "refused": 0,
+        "total": 658
+      },
+      "clean": {
+        "matched": 1530,
+        "missed": 1493,
+        "refused": 0,
+        "total": 3023
+      },
+      "date_skew": {
+        "matched": 86,
+        "missed": 79,
+        "refused": 0,
+        "total": 165
+      },
+      "duplicate_utr": {
+        "matched": 55,
+        "missed": 55,
+        "refused": 0,
+        "total": 110
+      },
+      "fee_deducted": {
+        "matched": 276,
+        "missed": 273,
+        "refused": 0,
+        "total": 549
+      },
+      "orphan": {
+        "matched": 0,
+        "missed": 0,
+        "refused": 55,
+        "total": 55
+      },
+      "partial_payment": {
+        "matched": 166,
+        "missed": 164,
+        "refused": 0,
+        "total": 330
+      },
+      "rounding_drift": {
+        "matched": 53,
+        "missed": 57,
+        "refused": 0,
+        "total": 110
+      }
+    }
+  },
+  "curve": {
+    "is_degenerate": false,
+    "n_points": 2,
+    "points": [
+      {
+        "coverage": 0.48412537917087967,
+        "money_error_ratio": 0.0,
+        "money_weighted_precision": 1.0,
+        "n_false_positives": 0,
+        "n_predicted": 2394,
+        "n_true_positives": 2394,
+        "orphan_refusal_rate": 1.0,
+        "precision": 1.0,
+        "recall": 0.48412537917087967,
+        "threshold": 1.0
+      },
+      {
+        "coverage": 0.5170879676440849,
+        "money_error_ratio": 0.010762486611944552,
+        "money_weighted_precision": 0.9791559302207531,
+        "n_false_positives": 55,
+        "n_predicted": 2557,
+        "n_true_positives": 2502,
+        "orphan_refusal_rate": 1.0,
+        "precision": 0.9784904184591318,
+        "recall": 0.5059656218402426,
+        "threshold": 0.7
+      }
+    ]
+  },
+  "run_id": "baseline-train",
+  "score": {
+    "coverage": 0.5170879676440849,
+    "matched_money": 63955026927,
+    "money_error_ratio": 0.010762486611944552,
+    "money_weighted_precision": 0.9791559302207531,
+    "n_decidable": 4945,
+    "n_false_positives": 55,
+    "n_orphans": 55,
+    "n_orphans_refused": 55,
+    "n_predicted": 2557,
+    "n_true_positives": 2502,
+    "orphan_refusal_rate": 1.0,
+    "precision": 0.9784904184591318,
+    "recall": 0.5059656218402426,
+    "threshold": 0.0,
+    "total_money": 123863851549,
+    "wrong_money": 1333083044
+  }
+}

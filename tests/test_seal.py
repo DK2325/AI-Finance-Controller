@@ -29,6 +29,8 @@ from pathlib import Path
 
 import pytest
 
+from astutil import code_strings
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TEST_DIR = REPO_ROOT / "data" / "test"
 MARKER = TEST_DIR / ".sealed"
@@ -82,13 +84,12 @@ def test_no_guarded_package_names_the_sealed_directory(package: str) -> None:
 
     for path in sorted((REPO_ROOT / package).rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Constant) and isinstance(node.value, str):
-                normalised = node.value.replace("\\", "/")
-                if any(token.replace("\\", "/") in normalised for token in SEALED_PATH_TOKENS):
-                    offenders.append(
-                        f"{path.relative_to(REPO_ROOT)}:{node.lineno} -> {node.value!r}"
-                    )
+        for node in code_strings(tree):
+            normalised = node.value.replace("\\", "/")
+            if any(token.replace("\\", "/") in normalised for token in SEALED_PATH_TOKENS):
+                offenders.append(
+                    f"{path.relative_to(REPO_ROOT)}:{node.lineno} -> {node.value!r}"
+                )
 
     assert not offenders, (
         f"{package}/ references the sealed test set:\n  " + "\n  ".join(offenders)

@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 
+from astutil import code_strings
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Packages that must never see the generator or the answer key.
@@ -71,14 +73,13 @@ def test_no_quarantined_package_references_the_answer_key() -> None:
 
     for path in _all_quarantined_files():
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Constant) and isinstance(node.value, str):
-                for artifact in FORBIDDEN_ARTIFACTS:
-                    if artifact in node.value:
-                        offenders.append(
-                            f"{path.relative_to(REPO_ROOT)}:{node.lineno} "
-                            f"string literal contains {artifact!r}"
-                        )
+        for node in code_strings(tree):
+            for artifact in FORBIDDEN_ARTIFACTS:
+                if artifact in node.value:
+                    offenders.append(
+                        f"{path.relative_to(REPO_ROOT)}:{node.lineno} "
+                        f"string literal contains {artifact!r}"
+                    )
 
     assert not offenders, (
         "the answer key is referenced outside evals/:\n  " + "\n  ".join(offenders)

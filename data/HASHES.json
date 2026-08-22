@@ -1,0 +1,44 @@
+{
+  "batches": {
+    "data/demo": {
+      "exclude": [],
+      "rows": 500,
+      "seed": 99,
+      "sha256": {
+        "bank_statement.csv": "d85f8d8d463bf48b8f8f8b9f3e715043d7b0aa18ede4a48dc7abf1d9a2a06d1e",
+        "gateway_settlements.csv": "5346e9e017d84eeab14521cd466c86790e41ed3a8a90e0b85cc7c4b8320e09f3",
+        "invoice_ledger.csv": "a422837a463dc89366146af667edc778f66f876574ddb5b7832ca8543e29eeed",
+        "manifest.json": "3cb9019442d2ace0ae010a73fb0361ea0fb1d08e04e8185b0153d0f9e2bd82b5",
+        "truth.csv": "1928e623c04a77360d8944b38669f607a765f538d68fb10a682732915aca07d5"
+      }
+    },
+    "data/test": {
+      "exclude": [],
+      "rows": 5000,
+      "seed": 7,
+      "sha256": {
+        "bank_statement.csv": "558de0ca06c27df92db49784f4068ae231e97ff387266c0fbb77d96c80b80305",
+        "gateway_settlements.csv": "d9e8d2f601684cc66c5bd41328a40ca9855b20d4bc22a2b502efc123930c84c2",
+        "invoice_ledger.csv": "0e97088f56780e53a585ec6f4acca8926e433d3a47385913edaaefd7233bab50",
+        "manifest.json": "35ce44d28f6ad23dcb006d600179627b480144813d6ac2ba0ed1b870a8faee62",
+        "truth.csv": "cd1326d24f0e03c929ca856bc40b8be160806335a932ba50de06900c67f0f8f0"
+      }
+    },
+    "data/train": {
+      "exclude": [
+        "tds_deducted",
+        "refund_netted"
+      ],
+      "rows": 5000,
+      "seed": 42,
+      "sha256": {
+        "bank_statement.csv": "79f3b2f6cafb1c143293d8471ed79ad04ce84fc4a5fb448c28e0386cee9b718d",
+        "gateway_settlements.csv": "77a9427a0c2dcaf3bb8d4eaaa2bea5886728d9273ea1caf5cf1bafe8fa2813d9",
+        "invoice_ledger.csv": "1b55c518b17c1318ff1e698b457b46026eed9209d2f5337b9867b7403d1a7642",
+        "manifest.json": "a327f75085e7cff8426e2914b1e656d15b597244e33baa3f4244441807a93aed",
+        "truth.csv": "0292ce3241b59a262c018502e5c87e289492ddeb2d74332e55acbb39e86549d2"
+      }
+    }
+  },
+  "why": "Committed hashes of the generated batches. tests/test_determinism.py regenerates each batch and compares against these. Comparing two fresh generations to each other could not catch a platform-dependent generator: on Linux both would agree with each other while differing from what is committed here. The api container is Linux, so that gap was live rather than theoretical."
+}

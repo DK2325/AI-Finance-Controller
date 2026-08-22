@@ -1,0 +1,30 @@
+{
+  "is_degenerate": false,
+  "n_points": 2,
+  "points": [
+    {
+      "coverage": 0.48412537917087967,
+      "money_error_ratio": 0.0,
+      "money_weighted_precision": 1.0,
+      "n_false_positives": 0,
+      "n_predicted": 2394,
+      "n_true_positives": 2394,
+      "orphan_refusal_rate": 1.0,
+      "precision": 1.0,
+      "recall": 0.48412537917087967,
+      "threshold": 1.0
+    },
+    {
+      "coverage": 0.5170879676440849,
+      "money_error_ratio": 0.010762486611944552,
+      "money_weighted_precision": 0.9791559302207531,
+      "n_false_positives": 55,
+      "n_predicted": 2557,
+      "n_true_positives": 2502,
+      "orphan_refusal_rate": 1.0,
+      "precision": 0.9784904184591318,
+      "recall": 0.5059656218402426,
+      "threshold": 0.7
+    }
+  ]
+}
