@@ -93,8 +93,12 @@ async function badges(data) {
     [`${((free / total) * 100).toFixed(0)}% of exceptions settled with no model call`, "live"],
   ];
   if (service) {
+    /* Name it. "model configured" is service-availability information sitting beside the
+       central claim, and a vague status badge next to a strong one invites the reader to
+       doubt the strong one. A model name is concrete. */
+    const shortName = (service.model || "").split("/").pop() || "";
     items.push([
-      service.llm === "live" ? "model configured" : "model not configured",
+      service.llm === "live" ? shortName : "no model configured",
       service.llm === "live" ? "" : "mock",
     ]);
   }
@@ -292,7 +296,7 @@ function buildReasons(data) {
   list.innerHTML = data.reason_breakdown
     .map(
       (r) => `<li class="reason">
-        <div><code>${r.code}</code>${
+        <div class="reason-code"><code>${r.code}</code>${
           r.needs_llm
             ? '<span class="pill llm">explained by model</span>'
             : '<span class="pill free">no model call</span>'
@@ -305,3 +309,346 @@ function buildReasons(data) {
 }
 
 boot();
+
+/* ==========================================================================
+ * Screens two and three: the review queue, and running a batch.
+ * ========================================================================== */
+
+const screens = { exceptions: [] };
+
+function switchTo(name) {
+  document.querySelectorAll(".tab").forEach((tab) =>
+    tab.setAttribute("aria-current", String(tab.dataset.screen === name))
+  );
+  if (name === "dashboard") render(state.data);
+  else if (name === "review") renderReview();
+  else renderUpload();
+}
+
+document.querySelectorAll(".tab").forEach((tab) =>
+  tab.addEventListener("click", () => switchTo(tab.dataset.screen))
+);
+
+/* ---------------------------------------------------------------- review */
+
+async function renderReview() {
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+  app.appendChild(document.getElementById("review-template").content.cloneNode(true));
+
+  const select = document.getElementById("filter-code");
+  (state.data.reason_breakdown || []).forEach((r) => {
+    const option = document.createElement("option");
+    option.value = r.code;
+    option.textContent = r.code + " (" + fmtInt(r.count) + ")";
+    select.appendChild(option);
+  });
+  select.addEventListener("change", () => loadExceptions(select.value));
+
+  await loadExceptions("");
+}
+
+async function loadExceptions(code) {
+  const query = new URLSearchParams({ limit: "60" });
+  if (code) query.set("code", code);
+
+  const body = await (
+    await fetch("/api/runs/" + state.data.run_id + "/exceptions?" + query)
+  ).json();
+  screens.exceptions = body.exceptions;
+
+  document.getElementById("filter-count").textContent =
+    fmtInt(body.exceptions.length) + " shown of " + fmtInt(body.total);
+
+  const list = document.getElementById("ex-list");
+  list.innerHTML = body.exceptions
+    .map(
+      (e, i) =>
+        '<li class="ex-item" data-i="' + i + '" tabindex="0">' +
+        '<span class="ex-id">' + e.entity_id + "</span>" +
+        '<span class="ex-code">' + e.reason_code + "</span></li>"
+    )
+    .join("");
+
+  list.querySelectorAll(".ex-item").forEach((item) => {
+    const pick = () => selectException(Number(item.dataset.i));
+    item.addEventListener("click", pick);
+    item.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        pick();
+      }
+    });
+  });
+
+  if (body.exceptions.length) selectException(0);
+}
+
+async function selectException(index) {
+  document.querySelectorAll(".ex-item").forEach((item, i) =>
+    item.setAttribute("aria-current", String(i === index))
+  );
+
+  const row = screens.exceptions[index];
+  const detail = document.getElementById("ex-detail");
+  detail.innerHTML = '<p class="empty">Loading evidence…</p>';
+
+  const ev = await (
+    await fetch("/api/runs/" + state.data.run_id + "/exceptions/" + row.entity_id)
+  ).json();
+  detail.innerHTML = evidenceHtml(ev);
+  wireActions(ev);
+}
+
+function rows(pairs) {
+  return pairs
+    .filter((pair) => pair[1] !== undefined && pair[1] !== null && pair[1] !== "")
+    .map((pair) => '<div class="ev-row"><dt>' + pair[0] + "</dt><dd>" + pair[1] + "</dd></div>")
+    .join("");
+}
+
+function evidenceHtml(ev) {
+  const s = ev.settlement;
+  const t = ev.bank_txn;
+  const i = ev.invoice;
+
+  const settlementCard = s
+    ? rows([
+        ["settlement", s.settlement_id], ["UTR", s.utr], ["method", s.method],
+        ["settled", s.settled_date], ["gross", s.gross], ["fee", s.fee],
+        ["tax", s.tax], ["net", "<strong>" + s.net + "</strong>"],
+      ])
+    : "<p>not found</p>";
+
+  const bankCard = t
+    ? rows([
+        ["txn", t.txn_id], ["bank", t.bank], ["value date", t.value_date],
+        ["credit", "<strong>" + t.credit + "</strong>"],
+      ]) + '<div class="ev-narration">' + t.narration + "</div>"
+    : "<p>No bank credit was considered. Blocking produced no candidate for this payout " +
+      "— the finding is the absence, not a gap in this screen.</p>";
+
+  const invoiceCard = i
+    ? rows([
+        ["invoice", i.invoice_id], ["customer", i.customer_name],
+        ["dated", i.invoice_date], ["TDS section", i.tds_section],
+        ["amount", "<strong>" + i.amount + "</strong>"],
+      ])
+    : "<p>No invoice could be identified. Only ~38% of gateway rows carry order_receipt, " +
+      "and the narration named none.</p>";
+
+  const diff =
+    ev.difference_paise !== null && ev.difference_paise !== undefined
+      ? '<div class="ev-diff">Bank credit differs from the settlement net by <strong>₹' +
+        ev.difference +
+        "</strong>. That difference is what a human is being asked to explain.</div>"
+      : "";
+
+  return (
+    '<div class="ev-head"><h3>' + ev.entity_id + "</h3>" +
+    '<span class="ex-code">' + ev.reason_family + "</span></div>" +
+    '<p class="ev-why"><code>' + ev.reason_code + "</code> " + ev.detail + "</p>" +
+    '<div class="ev-cards">' +
+    '<div class="ev-card"><h4>Gateway settlement</h4>' + settlementCard + "</div>" +
+    '<div class="ev-card' + (t ? "" : " absent") + '"><h4>Bank credit</h4>' + bankCard + "</div>" +
+    '<div class="ev-card' + (i ? "" : " absent") + '"><h4>Invoice</h4>' + invoiceCard + "</div>" +
+    "</div>" + diff +
+    '<div class="ev-actions">' +
+    '<input id="approver" placeholder="your name" value="dushyant">' +
+    '<button type="button" class="btn approve" data-action="approve">Approve</button>' +
+    '<button type="button" class="btn reject" data-action="reject">Reject</button>' +
+    '<button type="button" class="btn journal" id="propose">Propose journal entry</button>' +
+    "</div>" +
+    '<div class="ev-result" id="ev-result" hidden></div>'
+  );
+}
+
+function wireActions(ev) {
+  const result = document.getElementById("ev-result");
+  const show = (html) => {
+    result.hidden = false;
+    result.innerHTML = html;
+  };
+
+  document.querySelectorAll("[data-action]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      const approver = document.getElementById("approver").value.trim();
+      if (!approver) return show("An approval with no approver is not an approval.");
+
+      button.disabled = true;
+      try {
+        const response = await fetch(
+          "/api/runs/" + state.data.run_id + "/exceptions/" + ev.entity_id + "/decision",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: button.dataset.action, approver: approver }),
+          }
+        );
+        const body = await response.json();
+        show(
+          "Recorded as <strong>" + body.record.decision + "</strong> by <strong>" +
+          body.record.approver + "</strong> — stored in <code>" + body.stored_in +
+          "</code>, " + body.detail + ".<br>Filed as an escalation rather than a match: a " +
+          "human verdict counted in the auto-match rate would corrupt the number the whole " +
+          "thesis rests on."
+        );
+      } catch (err) {
+        show("Could not record the decision: " + err.message);
+      } finally {
+        button.disabled = false;
+      }
+    })
+  );
+
+  document.getElementById("propose").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = "Asking the model…";
+    try {
+      const body = await (
+        await fetch(
+          "/api/runs/" + state.data.run_id + "/exceptions/" + ev.entity_id + "/journal",
+          { method: "POST" }
+        )
+      ).json();
+
+      if (!body.proposed) {
+        show("No entry proposed — <code>" + body.reason_code + "</code>: " + body.detail);
+        return;
+      }
+      show(entryHtml(body));
+    } catch (err) {
+      show("Could not propose an entry: " + err.message);
+    } finally {
+      button.disabled = false;
+      button.textContent = "Propose journal entry";
+    }
+  });
+}
+
+function entryHtml(body) {
+  const entry = body.proposed;
+  const money = (paise) =>
+    paise ? "₹" + (paise / 100).toLocaleString("en-IN") : "";
+
+  const lines = (entry.lines || [])
+    .map(
+      (l) =>
+        "<tr><td>" + l.account_code + "</td><td>" + (l.narrative || "") +
+        '</td><td class="num">' + money(l.debit) +
+        '</td><td class="num">' + money(l.credit) + "</td></tr>"
+    )
+    .join("");
+
+  return (
+    "<div><strong>Proposed for a human to approve — never posted automatically.</strong> " +
+    (entry.narrative || "") + "</div>" +
+    '<div class="entry"><table><thead><tr><th>Account</th><th>Line</th>' +
+    "<th>Debit</th><th>Credit</th></tr></thead><tbody>" + lines + "</tbody></table></div>" +
+    '<div style="margin-top:10px">The chart of accounts is a closed set, so the model ' +
+    "cannot post to an account that does not exist — and the entry had to balance to the " +
+    "paisa or it would have been refused before reaching this screen.<br><code>" +
+    body.audit.prompt_version + "</code> · " + fmtInt(body.usage.billed_tokens) + " tokens</div>"
+  );
+}
+
+/* ---------------------------------------------------------------- upload */
+
+function renderUpload() {
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+  app.appendChild(document.getElementById("upload-template").content.cloneNode(true));
+
+  const inputs = ["f-gateway", "f-bank", "f-invoices"].map((id) =>
+    document.getElementById(id)
+  );
+  const runButton = document.getElementById("run-upload");
+
+  inputs.forEach((input) =>
+    input.addEventListener("change", () => {
+      input.closest(".drop").classList.toggle("filled", Boolean(input.files.length));
+      runButton.disabled = !inputs.every((f) => f.files.length);
+    })
+  );
+
+  document.getElementById("run-demo").addEventListener("click", () =>
+    submitRun({ batch_dir: "data/demo", run_id: "demo-live", mock_llm: true })
+  );
+
+  runButton.addEventListener("click", async () => {
+    const form = new FormData();
+    form.append("gateway", inputs[0].files[0]);
+    form.append("bank", inputs[1].files[0]);
+    form.append("invoices", inputs[2].files[0]);
+
+    setJob("Uploading…", 0.1, "");
+    try {
+      const uploaded = await (
+        await fetch("/api/upload", { method: "POST", body: form })
+      ).json();
+      if (uploaded.detail) return setJob("Upload refused", 0, uploaded.detail);
+      await submitRun({
+        batch_dir: uploaded.batch_dir,
+        run_id: "upload-" + Date.now(),
+        mock_llm: true,
+      });
+    } catch (err) {
+      setJob("Upload failed", 0, err.message);
+    }
+  });
+}
+
+function setJob(step, progress, note) {
+  document.getElementById("job").hidden = false;
+  document.getElementById("job-step").textContent = step;
+  document.getElementById("job-fill").style.width = Math.round(progress * 100) + "%";
+  document.getElementById("job-note").innerHTML = note;
+}
+
+async function submitRun(payload) {
+  setJob(
+    "Submitting…", 0.05,
+    "Long runs are jobs with status polling, never a blocking request."
+  );
+
+  const job = await (
+    await fetch("/api/jobs/recon", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+  ).json();
+
+  if (!job.job_id) return setJob("Refused", 0, job.detail || "unknown error");
+
+  /* Poll rather than wait. The API never blocks on a run, so neither does the screen. */
+  const poll = setInterval(async () => {
+    const status = await (await fetch("/api/jobs/" + job.job_id)).json();
+    setJob(status.step || status.status, status.progress || 0.3, "");
+
+    if (status.status === "done") {
+      clearInterval(poll);
+      const result = status.result || {};
+      setJob(
+        "Done", 1,
+        fmtInt(result.matched || 0) + " matched, " +
+        fmtInt(result.exceptions || 0) + ' exceptions. <a href="#" id="open-run">Open this run</a>'
+      );
+      const link = document.getElementById("open-run");
+      if (link) {
+        link.addEventListener("click", async (event) => {
+          event.preventDefault();
+          const data = await (await fetch("/api/runs/" + result.run_id)).json();
+          state.data = data;
+          state.points = data.operating_points;
+          state.index = data.selected_index || 0;
+          switchTo("dashboard");
+        });
+      }
+    } else if (status.status === "failed") {
+      clearInterval(poll);
+      setJob("Failed", 0, status.error || "unknown error");
+    }
+  }, 900);
+}

@@ -16,9 +16,88 @@
   </div>
 </header>
 
+<nav class="tabs wrap">
+  <button type="button" class="tab" data-screen="dashboard" aria-current="true">Dashboard</button>
+  <button type="button" class="tab" data-screen="review">Review queue</button>
+  <button type="button" class="tab" data-screen="upload">Run a batch</button>
+</nav>
+
 <main class="wrap" id="app">
   <p class="loading">Loading run…</p>
 </main>
+
+<template id="review-template">
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Review queue</h2>
+      <p class="sub">
+        Every exception, with the rows the decision was made from. Nothing here is
+        summarised — resolving one means comparing an amount against an amount and a name
+        against a narration, and a summary removes the detail that does it.
+      </p>
+    </div>
+
+    <div class="filters">
+      <label>Reason
+        <select id="filter-code"><option value="">all codes</option></select>
+      </label>
+      <span class="filter-count" id="filter-count">—</span>
+    </div>
+
+    <div class="queue">
+      <ul class="ex-list" id="ex-list"></ul>
+      <div class="ex-detail" id="ex-detail">
+        <p class="empty">Select an exception to see its evidence.</p>
+      </div>
+    </div>
+  </section>
+</template>
+
+<template id="upload-template">
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Run a batch</h2>
+      <p class="sub">
+        The demo batch is one click and needs no files. Uploading your own runs the same
+        pipeline — but an uploaded batch has no answer key, so the system reports what it
+        decided and declines to claim accuracy it cannot measure.
+      </p>
+    </div>
+
+    <div class="demo-cta">
+      <button type="button" class="primary" id="run-demo">Run the demo batch</button>
+      <span class="hint">495 settlements · no files needed · finishes in seconds</span>
+    </div>
+
+    <div class="upload-grid">
+      <label class="drop">
+        <span class="drop-title">Gateway settlements</span>
+        <span class="drop-sub">gateway_settlements.csv</span>
+        <input type="file" accept=".csv" id="f-gateway">
+      </label>
+      <label class="drop">
+        <span class="drop-title">Bank statement</span>
+        <span class="drop-sub">bank_statement.csv</span>
+        <input type="file" accept=".csv" id="f-bank">
+      </label>
+      <label class="drop">
+        <span class="drop-title">Invoice ledger</span>
+        <span class="drop-sub">invoice_ledger.csv</span>
+        <input type="file" accept=".csv" id="f-invoices">
+      </label>
+    </div>
+
+    <button type="button" class="primary ghost" id="run-upload" disabled>
+      Upload and reconcile
+    </button>
+
+    <div class="job" id="job" hidden>
+      <div class="job-step" id="job-step">—</div>
+      <div class="job-bar"><div class="job-fill" id="job-fill"></div></div>
+      <div class="job-note" id="job-note"></div>
+    </div>
+  </section>
+</template>
 
 <template id="explorer-template">
   <section class="panel">

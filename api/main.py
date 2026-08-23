@@ -28,7 +28,7 @@ from api.jobs import REGISTRY, Job
 from api.review import ACTIONS, decisions_for, evidence_for, record_decision
 from api.service import dashboard, list_runs, load_run
 from ledgerloop import __version__
-from ledgerloop.config import llm_available
+from ledgerloop.config import llm_available, nvidia_model
 from ledgerloop.db import engine
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "web" / "static"
@@ -57,6 +57,9 @@ def health() -> dict:
         "version": __version__,
         "database": db_ok,
         "llm": "live" if llm_available() else "mock",
+        # Named, not just "configured". A vague status badge sitting beside a strong claim
+        # invites the reader to doubt the claim; a model name is concrete and answerable.
+        "model": nvidia_model(),
     }
 
 
