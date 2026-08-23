@@ -4,6 +4,21 @@ Last updated 23 Aug 2026, end of Phase 5. Read this first when picking the build
 
 ---
 
+## Read `notes/conventions.md` first
+
+Standing rules that are **not** to be re-derived from a conversation: commit-message
+convention, author identity, how the seal is handled, the isolation boundary, integer
+paise, secrets. They live in a file because a new session reads files, not history.
+
+The two that catch people immediately:
+
+- **No attribution trailers and no schedule references in commit messages.** Describe the
+  change and the reasoning; end at the last line of the body.
+- **Author identity is repo-local and a fresh clone loses it.** Re-set
+  `user.name` / `user.email` before the first commit in a new clone, or it lands under
+  whatever global identity the machine has. That has happened once and needed a history
+  rewrite to fix.
+
 ## Where the build is
 
 **Phases 0–6 complete.** Phase 7 is next: scale, the sealed test set, failure analysis.
@@ -40,7 +55,8 @@ and it is the only irreversible one in the project.
 
 ### Start here, in a fresh session
 
-> **"Read notes/phase-7-precommitment.md and notes/RESUME.md, then break the seal."**
+> **"Read notes/conventions.md and notes/phase-7-precommitment.md, then break the
+> seal."**
 
 Read the pre-commitment **from the repository**, not from anyone's memory of a
 conversation. It is committed at `a733ad4`, before the seal was touched, and
@@ -219,6 +235,12 @@ Delete before the repo goes public:
 
 - `BUILD.md` — an internal plan with dates and phase slots. Not part of the deliverable.
 - `notes/RESUME.md` — this file. A session handoff, not evidence.
+- `notes/conventions.md` — how the work was done, not how the system works.
+- `notes/phase-5-report.md`, `notes/phase-6-report.md`, `notes/phase-7-precommitment.md` —
+  **decide deliberately.** The reports are phase-gate artifacts and read as management. The
+  pre-commitment is different: it is *evidence* that the operating point was fixed before
+  the test set was read, and deleting it would remove the only proof of that ordering. Keep
+  the pre-commitment; fold anything worth keeping from the reports into the README.
 
 Keep, and link from the README, because they are evidence:
 
