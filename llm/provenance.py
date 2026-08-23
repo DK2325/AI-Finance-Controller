@@ -434,14 +434,21 @@ class ProvenanceStats:
         return self.fields_absent / self.fields_checked if self.fields_checked else 0.0
 
     @property
-    def claim_rate(self) -> float:
+    def claim_rate(self) -> float | None:
         """Of the fields that were asked for, how many were answered at all. Coverage.
 
         Not a correctness measure and not meant to be one. It is the number that moves
         when a model quietly stops answering, which no failure rate can see.
+
+        **None, not 0.0, when nothing verifiable was asked for.** The `reason` job returns
+        prose for a human -- an explanation is supposed to contain words the narration does
+        not, so none of its fields are checkable against a source row. Reporting 0.0 there
+        would read as "the model answered nothing" when the truth is "there was nothing to
+        verify", and a coverage metric that cries wolf on jobs it does not apply to is a
+        coverage metric people learn to ignore.
         """
         offered = self.fields_checked + self.fields_empty
-        return self.fields_checked / offered if offered else 0.0
+        return self.fields_checked / offered if offered else None
 
     @property
     def item_failure_rate(self) -> float:
@@ -469,6 +476,6 @@ class ProvenanceStats:
             # Coverage: of what was asked for, how much was answered. Reported beside the
             # quality numbers, never instead of them.
             "fields_empty": self.fields_empty,
-            "claim_rate": round(self.claim_rate, 5),
+            "claim_rate": round(self.claim_rate, 5) if self.claim_rate is not None else None,
             "claim_rate_by_field": self.claim_rate_by_field(),
         }

@@ -328,7 +328,24 @@ def test_a_field_that_stops_being_answered_moves_the_claim_rate() -> None:
     # Only coverage separates them.
     assert answering.claim_rate == 1.0
     assert silent.claim_rate == 0.5
+
+
+def test_the_claim_rate_is_reported_per_field_too() -> None:
+    silent = ProvenanceStats()
+    for _ in range(2):
+        silent.record(verify({"utr": "300000004412"}, ACME))
+    for _ in range(2):
+        silent.record(verify({"utr": None}, ACME))
     assert silent.claim_rate_by_field() == {"utr": 0.5}
+
+
+def test_a_job_with_nothing_verifiable_reports_no_claim_rate() -> None:
+    """None, not 0.0. The `reason` job returns prose; there is nothing to check
+    against a source row, and 0.0 would read as "answered nothing"."""
+    stats = ProvenanceStats()
+    stats.record(verify({"id": "EX1", "reason_text": "Amount differs."}, ACME))
+    assert stats.claim_rate is None
+    assert stats.as_dict()["claim_rate"] is None
 
 
 def test_stats_separate_the_item_rate_from_the_field_rate() -> None:

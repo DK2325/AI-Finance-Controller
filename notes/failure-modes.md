@@ -354,3 +354,43 @@ set of rows.
 in the safe direction — fewer exceptions reach the model than designed for, and the run is
 slower than claimed rather than faster. Being over-provisioned is the right way to be
 wrong. It is still being wrong, and the next proxy has no obligation to fail politely.
+
+---
+
+## An anchored metric: reason-code agreement
+
+**Reported as 100 out of 100 in the first end-to-end run. It means almost nothing, and the
+reason is a flaw in how the measurement was designed rather than in the result.**
+
+The `reason` prompt hands the model the pipeline's own conclusion:
+
+```
+system_reason_code: {reason_code}
+```
+
+and then asks it to tag the exception. The prompt even says *"The row tells you which of
+these the system used. Agreeing with it is normal."* So a 100% agreement rate measures
+whether the model can copy a field, which it can.
+
+**Why the field is in the prompt at all.** The model is being asked to *explain* a decision
+already taken, and an explanation that does not know what it is explaining is worse than
+useless. Withholding the code would improve the metric and degrade the product.
+
+**So the metric has to change, not the prompt.** Two options for Phase 7, neither taken
+yet:
+
+1. **Score against truth, not against ourselves.** `evals/` can see the answer key: for
+   each exception, does the assigned code correctly describe why the settlement was not
+   matched? A `NO_CANDIDATE` on a settlement that truth says had a real link is a
+   *correct* code describing a real miss; a `NO_CANDIDATE` on an orphan is correct in a
+   different way. That is a real accuracy measure and it needs no model agreement at all.
+2. **A held-out arm.** Run a sample with `system_reason_code` withheld and measure
+   agreement there. That is informative, and it costs a second prompt version to maintain.
+
+Option 1 is the one BUILD.md actually asks for (*"`ledgerloop eval` reports reason-code
+accuracy"*), and reason-code accuracy against truth is a different and better number than
+agreement with ourselves.
+
+**The general shape, which is the reusable part:** a metric that compares two things where
+one was told the other's answer is not measuring agreement, it is measuring transcription.
+Worth checking, for any agreement metric, what the second opinion had access to.

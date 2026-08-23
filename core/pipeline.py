@@ -21,11 +21,16 @@ from pathlib import Path
 from rapidfuzz import fuzz
 
 from core.blocking import Candidate, generate_candidates
+from core.exceptions import (
+    EnumerationResult,
+    SettlementEvidence,
+    enumerate_exceptions,
+)
 from core.features import counterparty_frequencies, extract
 from core.invoices import InvoiceLink, resolve_invoices
 from core.records import BankTxn, Invoice, Settlement, Sources
 from core.rules import RuleHit, apply_rules, date_penalty, subset_sum_hit
-from core.subsetsum import REASON_CAPPED, SubsetSumStats, search_bucket
+from core.subsetsum import SubsetSumStats, search_bucket
 
 GATEWAY_FILE = "gateway_settlements.csv"
 BANK_FILE = "bank_statement.csv"
@@ -78,10 +83,11 @@ class Timing:
 class ReconResult:
     matches: list[Match]
     exceptions: list[Exception_]
-    timing: Timing
-    blocking: dict
-    subset_sum: dict
-    n_rows: int
+    enumeration: EnumerationResult | None = None
+    timing: Timing = None  # type: ignore[assignment]
+    blocking: dict = None  # type: ignore[assignment]
+    subset_sum: dict = None  # type: ignore[assignment]
+    n_rows: int = 0
 
     def meta(self) -> dict:
         return {
@@ -97,6 +103,7 @@ class ReconResult:
             "subset_sum": self.subset_sum,
             "n_matches": len(self.matches),
             "n_exceptions": len(self.exceptions),
+            "enumeration": self.enumeration.as_dict() if self.enumeration else None,
         }
 
 
@@ -260,6 +267,10 @@ def reconcile(batch_dir: Path | str, with_features: bool = True) -> ReconResult:
 
     start = time.perf_counter()
     matches: list[Match] = []
+    # Collected here rather than derived afterwards: a Match carries the
+    # settlement_id (the payout batch), not the entity_id, so the set of matched
+    # settlements cannot be reconstructed from the match list.
+    matched_ids: set[str] = set()
 
     for candidate, hit, counterparty in accepted:
         features = (
@@ -279,6 +290,7 @@ def reconcile(batch_dir: Path | str, with_features: bool = True) -> ReconResult:
             # exception, not a match -- emitting a triple with an empty invoice would be
             # a false auto-match with money attached.
             continue
+        matched_ids.add(candidate.settlement.entity_id)
         matches.append(
             Match(
                 invoice_id=link.invoice_id,
@@ -313,6 +325,7 @@ def reconcile(batch_dir: Path | str, with_features: bool = True) -> ReconResult:
         link = _linked(settlement)
         if link is None:
             continue
+        matched_ids.add(settlement.entity_id)
         matches.append(
             Match(
                 invoice_id=link.invoice_id,
@@ -326,21 +339,68 @@ def reconcile(batch_dir: Path | str, with_features: bool = True) -> ReconResult:
         )
     timing.record("features", time.perf_counter() - start)
 
-    # A bucket too large to search is an exception with a reason code, never a silent
-    # drop. Coverage must not be flattered by work that was quietly skipped.
+    # Every settlement that is not matched becomes an exception with a reason code. The
+    # same classifier the model path uses, so a settlement declined on rule tiers and one
+    # declined on a calibrated probability are described by one piece of logic rather than
+    # two that drift -- see core/exceptions.py for the precedence.
+    capped = set(subset_stats.skipped_settlement_ids)
+
+    # Built from EVERY blocking candidate, not only the rule-scored ones. A settlement
+    # that blocking found five credits for and no rule tier accepted did not fail because
+    # "no bank credit resembled this payout" -- that sentence would be false in an audit
+    # record. It scored zero, which is LOW_CONFIDENCE, and the two are different findings
+    # for whoever picks the exception up.
+    rule_scores = {
+        (c.settlement.entity_id, c.txn.txn_id): hit.score for c, hit, _ in scored
+    }
+    best_by_entity: dict[str, list[tuple[float, str, str]]] = defaultdict(list)
+    for candidate in candidates:
+        entity_id = candidate.settlement.entity_id
+        link = invoice_links.get(entity_id)
+        best_by_entity[entity_id].append(
+            (
+                rule_scores.get((entity_id, candidate.txn.txn_id), 0.0),
+                candidate.txn.txn_id,
+                link.invoice_id if link else "",
+            )
+        )
+
+    evidence: dict[str, SettlementEvidence] = {}
+    for entity_id, options in best_by_entity.items():
+        ranked = sorted(options, key=lambda o: -o[0])
+        evidence[entity_id] = SettlementEvidence(
+            entity_id=entity_id,
+            n_candidates=len(options),
+            best_score=ranked[0][0],
+            second_score=ranked[1][0] if len(ranked) > 1 else 0.0,
+            best_txn_id=ranked[0][1],
+            best_invoice_id=ranked[0][2],
+            capped=entity_id in capped,
+        )
+    for entity_id in capped:
+        evidence.setdefault(entity_id, SettlementEvidence(entity_id=entity_id, capped=True))
+
+    enumeration = enumerate_exceptions(
+        all_entity_ids=[s.entity_id for s in sources.payments],
+        matched_entity_ids=matched_ids,
+        evidence_by_entity=evidence,
+        calibrated=False,
+    )
+
     exceptions = [
         Exception_(
-            settlement_id=entity_id,
-            invoice_id="",
-            reason_code=REASON_CAPPED,
-            detail="subset-sum bucket exceeded the search cap",
+            settlement_id=record.entity_id,
+            invoice_id=record.invoice_id,
+            reason_code=str(record.reason_code),
+            detail=record.detail,
         )
-        for entity_id in dict.fromkeys(subset_stats.skipped_settlement_ids)
+        for record in enumeration.exceptions
     ]
 
     return ReconResult(
         matches=matches,
         exceptions=exceptions,
+        enumeration=enumeration,
         timing=timing,
         blocking=blocking_stats.as_dict(),
         subset_sum=subset_stats.as_dict(),

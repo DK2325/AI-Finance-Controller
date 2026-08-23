@@ -1,0 +1,59 @@
+{
+  "settlements": 4945,
+  "matched": 2497,
+  "exceptions": 2448,
+  "by_reason": {
+    "AMBIGUOUS_CANDIDATES": 28,
+    "BELOW_THRESHOLD": 1170,
+    "INVOICE_ALREADY_CLAIMED": 102,
+    "NO_CANDIDATE": 296,
+    "NO_INVOICE_LINK": 852
+  },
+  "deterministic_share": 0.5106,
+  "llm_bound": 1198,
+  "explained_now": 100,
+  "llm": {
+    "job": "reason",
+    "prompt_version": "reason.v1+bd9e28d1ab1c",
+    "batches": 5,
+    "items": 100,
+    "succeeded": 100,
+    "failed": 0,
+    "failure_rate": 0.0,
+    "schema_failure_rate": 0.0,
+    "by_reason": {},
+    "unexpected_ids": [],
+    "wall_seconds": 182.724,
+    "achieved_rpm": 1.6,
+    "usage": {
+      "calls": 5,
+      "cached_calls": 0,
+      "retries": 0,
+      "input_tokens": 22001,
+      "output_tokens": 16801,
+      "billed_tokens": 38802,
+      "tokens_served_from_cache": 0,
+      "seconds": 282.69
+    },
+    "provenance": {
+      "items": 100,
+      "items_failed": 0,
+      "item_failure_rate": 0.0,
+      "fields_checked": 0,
+      "fields_absent": 0,
+      "field_failure_rate": 0.0,
+      "failures_by_field": {},
+      "fields_empty": 0,
+      "claim_rate": 0.0,
+      "claim_rate_by_field": {}
+    }
+  },
+  "reason_code_agreement": {
+    "agreed": 100,
+    "disagreed": 0,
+    "rate": 1.0,
+    "disagreements": {}
+  },
+  "audit_records": 5045,
+  "distinct_record_shapes": 1
+}
