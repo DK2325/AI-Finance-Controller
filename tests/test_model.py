@@ -328,3 +328,99 @@ def test_calibrated_model_beats_the_uncalibrated_rules_on_precision() -> None:
 
     assert model_score.precision > rules_score.precision
     assert model_score.n_false_positives < rules_score.n_false_positives
+
+
+# ------------------------------------- the two resolvers must not drift again
+
+
+def _random_candidates(rng, n: int = 60) -> list[dict]:
+    """Candidate rows with heavy probability ties, which is the real distribution.
+
+    99.7% of real candidates share an exact calibrated probability, so a random test
+    using distinct floats would never exercise the path that actually matters.
+    """
+    return [
+        {
+            "entity_id": f"E{rng.randrange(n // 3)}",
+            "invoice_id": f"INV{rng.randrange(n // 3)}" if rng.random() > 0.1 else "",
+            "txn_id": f"T{i}",
+            "settlement_id": f"S{i}",
+            "date_delta_days": float(rng.randrange(-5, 6)),
+            "rule_score": rng.choice([0.0, 0.5, 0.9]),
+            "invoice_score": rng.choice([0.0, 0.7, 1.0]),
+        }
+        for i in range(n)
+    ]
+
+
+def test_the_training_resolver_and_the_inference_resolver_agree() -> None:
+    """A docstring claimed these mirrored each other exactly. It was wrong for several
+    phases, and the divergence -- an unstable np.argsort against a stable evidence sort --
+    moved the selected operating point by 17 points of coverage.
+
+    Aligning them once fixes today. This is what stops it recurring: if they cannot share
+    an implementation, they need a test that fails the moment they disagree.
+    """
+    import random
+
+    import numpy as np
+
+    from core.candidates import CandidateRow
+    from model.predict import ScoredCandidate
+    from model.predict import resolve as resolve_inference
+    from model.train import resolve_indices
+
+    rng = random.Random(11)
+    for _ in range(25):
+        rows = _random_candidates(rng)
+        # Deliberately coarse: three distinct probabilities across sixty candidates.
+        p = np.array([rng.choice([1.0, 0.9927, 0.9452]) for _ in rows])
+
+        keep = resolve_indices(rows, p)
+        training = [rows[i]["txn_id"] for i in range(len(rows)) if keep[i]]
+
+        scored = [
+            ScoredCandidate(
+                row=CandidateRow(
+                    entity_id=r["entity_id"], settlement_id=r["settlement_id"],
+                    txn_id=r["txn_id"], invoice_id=r["invoice_id"],
+                    rule="r", rule_score=r["rule_score"], invoice_rule="i",
+                    invoice_score=r["invoice_score"], blocking_passes="p",
+                    settled_date="2026-01-01",
+                    features={"date_delta_days": r["date_delta_days"]},
+                ),
+                probability=float(prob),
+            )
+            for r, prob in zip(rows, p, strict=True)
+        ]
+        inference = [c.row.txn_id for c in resolve_inference(scored)]
+
+        assert sorted(training) == sorted(inference), (
+            "resolve_indices and resolve disagree; the operating point would be "
+            "selected on a resolver that inference does not use"
+        )
+
+
+def test_the_training_resolver_is_stable_under_input_reordering() -> None:
+    """np.argsort is unstable. With 99.7% of probabilities tied that decided nearly every
+    contested invoice, and not even reproducibly across numpy versions."""
+    import random
+
+    import numpy as np
+
+    from model.train import resolve_indices
+
+    rng = random.Random(5)
+    rows = _random_candidates(rng)
+    p = np.array([rng.choice([1.0, 0.9927]) for _ in rows])
+
+    forward = {rows[i]["txn_id"] for i in range(len(rows)) if resolve_indices(rows, p)[i]}
+
+    order = list(range(len(rows)))
+    rng.shuffle(order)
+    shuffled_rows = [rows[i] for i in order]
+    shuffled_p = np.array([p[i] for i in order])
+    keep = resolve_indices(shuffled_rows, shuffled_p)
+    shuffled = {shuffled_rows[i]["txn_id"] for i in range(len(shuffled_rows)) if keep[i]}
+
+    assert forward == shuffled
