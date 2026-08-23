@@ -166,6 +166,34 @@ need.
 number: *is this reading physically possible?* Two experiments were spent because it was
 not, and nobody asked.
 
+### The same error, four times: a message that names the wrong investigation
+
+This is now the most repeated mistake in the project, and every instance cost the same
+thing — time spent looking where the message pointed.
+
+| the message said | what was actually true | what it cost |
+|---|---|---|
+| "8,000 tokens produced 193 characters" | 23,973 characters were produced; `.strip()` had destroyed 23,780 of them before anything recorded a length | two experiments confirming a hypothesis about reasoning tokens |
+| "8% schema failure rate" | every completed call was valid; the failures were 429s, counted in the same bucket | a retry path made to look load-bearing when the rate limiter was talking |
+| "`NO_CANDIDATE`: no bank credit resembled this payout" | blocking had produced five candidates and every rule tier declined | an audit record that would send an investigator to the payment gateway |
+| "postgres unreachable" | Postgres was up; a foreign key refused the row | the first minutes of the wrong investigation |
+
+**None of these was a broken system.** In every case something failed for a real reason and
+then *described itself inaccurately*, and the description is what the next person acts on.
+A wrong number gets checked against something eventually. A wrong explanation gets believed
+and followed.
+
+**The fix is the same shape every time: classify rather than generalise.** The database
+error handler now separates unreachable, refused-by-constraint and schema-mismatch, because
+those are three different investigations and one label served none of them. The token
+counter records the raw length beside the stripped one. The spike counts transport
+separately from conformance. The reason code says "scored zero on rule tiers" when that is
+what happened.
+
+> **An error message is a hypothesis about what went wrong, and it deserves the same
+> scepticism as any other hypothesis.** If it is a guess, it should say so; if it can be
+> narrowed by looking at the exception type, it should be.
+
 ### And the sixth: an instrument that was correct and measured a different axis
 
 Distinct from the `.strip()` entry above, and the distinction is the useful part.

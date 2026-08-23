@@ -43,13 +43,15 @@
     </div>
 
     <div class="track-wrap">
-      <div class="track" id="track" role="group" aria-label="Operating points"></div>
-      <p class="track-note">
-        <strong>These are the only points that exist.</strong> Tick spacing is the number of
-        settlements each step admits — isotonic calibration produces a step function, so the
-        gaps are real and uneven. A smooth slider would imply a resolution the model does
-        not have.
+      <p class="track-note above">
+        <strong>These are the only points that exist</strong> — click or use ← → to move
+        between them. The gaps are drawn to scale: <em>width is the number of settlements
+        that step admits</em>. Isotonic calibration produces a step function, so the jumps
+        are real and wildly uneven, and a smooth slider would imply a resolution the model
+        does not have.
       </p>
+      <div class="track" id="track" role="group" aria-label="Operating points"></div>
+      <p class="track-foot" id="track-foot"></p>
     </div>
 
     <div class="consequences">

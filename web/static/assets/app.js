@@ -60,7 +60,7 @@ function render(data) {
     document.getElementById("explorer-template").content.cloneNode(true)
   );
 
-  badges(data);
+  badges(data);  /* async; the header fills in when /health answers */
   buildTrack();
   buildReasons(data);
 
@@ -70,15 +70,35 @@ function render(data) {
   update();
 }
 
-function badges(data) {
+async function badges(data) {
   const el = document.getElementById("badges");
+
+  /* The share of exceptions settled without a model call is the badge worth showing.
+     "LLM: mock" described how the run was invoked and read as a limitation; this describes
+     what the architecture achieved, which is the same fact stated as the strength it is. */
+  const breakdown = data.reason_breakdown || [];
+  const total = breakdown.reduce((sum, r) => sum + r.count, 0) || 1;
+  const free = breakdown.filter((r) => !r.needs_llm).reduce((sum, r) => sum + r.count, 0);
+
+  let service = null;
+  try {
+    service = await (await fetch("/health")).json();
+  } catch { /* the badge simply omits it */ }
+
   const items = [
     [`${fmtInt(data.settlements)} settlements`, ""],
     [data.calibrated ? `calibrated · ${data.calibration_method}` : "NOT calibrated",
       data.calibrated ? "live" : "mock"],
-    [data.mock_llm ? "LLM: mock" : "LLM: live", data.mock_llm ? "mock" : "live"],
     [`${state.points.length} operating points`, ""],
+    [`${((free / total) * 100).toFixed(0)}% of exceptions settled with no model call`, "live"],
   ];
+  if (service) {
+    items.push([
+      service.llm === "live" ? "model configured" : "model not configured",
+      service.llm === "live" ? "" : "mock",
+    ]);
+  }
+
   el.innerHTML = items
     .map(([text, cls]) => `<span class="badge ${cls}">${text}</span>`)
     .join("");
@@ -91,19 +111,54 @@ function buildTrack() {
   track.innerHTML = "";
 
   const sizes = state.data.step_sizes || [];
+
+  /* A step wide enough to read gets a label in the gap. Threshold is relative to the
+     largest step, so this adapts to a different run rather than hardcoding 732. */
+  const largest = Math.max(...sizes.slice(1), 1);
+  const LABEL_AT = Math.max(20, largest * 0.08);
+
   state.points.forEach((point, i) => {
     const tick = document.createElement("button");
     tick.type = "button";
     tick.className = "tick";
-    /* flex-grow IS the step size, so spacing carries information rather than decoration.
-       Minimum 1 so a zero-width step is still clickable. */
-    tick.style.flexGrow = String(Math.max(1, sizes[i] || 1));
-    tick.setAttribute("aria-label",
-      `${fmtPct(point.coverage)} auto-matched, ${point.false_matches} wrong`);
+
+    if (i === 0) {
+      /* The first point is where the range of choice BEGINS, not a step within it.
+         Scaling it by the 2,495 settlements it already matches pushed every real step
+         into the right third of the track, and read as a layout bug before it read as
+         information. */
+      tick.classList.add("endpoint");
+      tick.setAttribute("aria-label",
+        `most conservative point: ${fmtPct(point.coverage)} auto-matched`);
+    } else {
+      const size = Math.max(1, sizes[i] || 1);
+      tick.style.flexGrow = String(size);
+      tick.dataset.big = String(size >= LABEL_AT);
+      if (size >= LABEL_AT) {
+        const label = document.createElement("span");
+        label.className = "tick-label";
+        label.textContent = `+${fmtInt(size)} in one step`;
+        tick.appendChild(label);
+      }
+      tick.setAttribute("aria-label",
+        `${fmtPct(point.coverage)} auto-matched, ${point.false_matches} wrong, ` +
+        `${fmtInt(size)} more settlements than the previous point`);
+    }
+
     tick.dataset.pastFloor = String(point.precision < 0.995);
     tick.addEventListener("click", () => { state.index = i; update(); });
     track.appendChild(tick);
   });
+
+  const steps = sizes.slice(1);
+  const foot = document.getElementById("track-foot");
+  if (foot) {
+    foot.textContent =
+      `Left edge is the most conservative point this system can reach ` +
+      `(${fmtInt(state.points[0].matched)} settlements). ` +
+      `From there, ${steps.length} steps ranging from ` +
+      `${fmtInt(Math.min(...steps))} to ${fmtInt(Math.max(...steps))} settlements.`;
+  }
 
   /* Keyboard: the track is a real control, not a decorative strip. */
   track.tabIndex = 0;
@@ -139,11 +194,19 @@ function spark(svg, values, currentIndex, rising) {
     .join(" ");
   const colour = rising ? "#b3261e" : "#0d7a4a";
 
+  /* vector-effect="non-scaling-stroke" is the whole reason this is legible on a shared
+     screen. The SVG uses preserveAspectRatio="none" so it stretches to the card width,
+     and without this the stroke stretches too -- appearing thinner the wider the card
+     gets, which is exactly backwards. The marker is drawn in a nested un-stretched
+     coordinate space for the same reason: a scaled circle becomes an ellipse. */
+  const cx = x(currentIndex);
+  const cy = y(values[currentIndex]);
   svg.innerHTML =
-    `<path d="${path}" fill="none" stroke="${colour}" stroke-width="2"
-       stroke-linejoin="round" stroke-linecap="round" opacity="0.85"/>` +
-    `<circle cx="${x(currentIndex).toFixed(1)}" cy="${y(values[currentIndex]).toFixed(1)}"
-       r="4" fill="${colour}"/>`;
+    `<path d="${path}" fill="none" stroke="${colour}" stroke-width="2.5"
+       vector-effect="non-scaling-stroke"
+       stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>` +
+    `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4.5" fill="${colour}"
+       vector-effect="non-scaling-stroke" stroke="#fff" stroke-width="2"/>`;
 }
 
 /* ---------------------------------------------------------------- update */

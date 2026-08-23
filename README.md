@@ -447,6 +447,30 @@ Full analysis and the reasoning trail, including the correction: `notes/injectio
 
 ## Running it
 
+**Live:** https://ai-finance-controller-production.up.railway.app — seeded with a completed
+run, so it has something to show on a cold start with no training and no database write.
+
+### One deployment finding worth stating
+
+Managed Postgres providers inject `DATABASE_URL` as `postgresql://…` (Railway, Render) or
+the legacy `postgres://…`. SQLAlchemy reads that scheme as the **driver**, and bare
+`postgresql://` means psycopg2 — which this project does not install; it uses psycopg 3.
+
+> **A perfectly correct injected URL fails to connect, and fails looking like a network
+> problem rather than a driver one.**
+
+`ledgerloop/config.database_url()` normalises both forms to `postgresql+psycopg://`.
+
+Neither local path could have caught it. Locally `DATABASE_URL` is absent and the default
+already names the driver; `docker compose` sets it explicitly with `+psycopg`. Only a
+managed host injects the bare form — which is the argument for deploying early rather than
+at the end, and this was found on the first deploy rather than the last.
+
+(Railway also sets `DATABASE_URL` to an empty string when a variable reference does not
+resolve, and `os.environ.get(key, default)` returns that empty string rather than the
+default. Same symptom, different cause, also handled.)
+
+
 Docker Compose is the primary run path, not an optional extra.
 
 ```
