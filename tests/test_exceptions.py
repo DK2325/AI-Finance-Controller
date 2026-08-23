@@ -293,3 +293,83 @@ def test_row_hashes_are_stable_and_distinct() -> None:
 
 def test_every_record_is_timestamped_without_being_told_to() -> None:
     assert deterministic_record().created_at
+
+
+# ------------------------------------------------------------- tie-breaking
+
+
+def scored(entity: str, invoice: str, probability: float, date_delta: float = 0.0,
+           rule_score: float = 0.0, invoice_score: float = 0.0):
+    from core.candidates import CandidateRow
+    from model.predict import ScoredCandidate
+
+    return ScoredCandidate(
+        row=CandidateRow(
+            entity_id=entity, settlement_id=f"setl-{entity}", txn_id=f"txn-{entity}",
+            invoice_id=invoice, rule="r", rule_score=rule_score, invoice_rule="i",
+            invoice_score=invoice_score, blocking_passes="utr", settled_date="2026-01-01",
+            features={"date_delta_days": date_delta},
+        ),
+        probability=probability,
+    )
+
+
+def test_a_tie_is_broken_on_evidence_not_on_list_order() -> None:
+    """99.7% of candidates share an exact calibrated probability, so this is the common
+    path rather than an edge case. Isotonic gives excellent calibration and coarse
+    discrimination, and 'sort by probability' leaves almost every contest undecided."""
+    from model.predict import resolve
+
+    far = scored("A", "INV1", 0.9, date_delta=9.0)
+    near = scored("B", "INV1", 0.9, date_delta=1.0)
+
+    assert [c.row.entity_id for c in resolve([far, near])] == ["B"]
+    assert [c.row.entity_id for c in resolve([near, far])] == ["B"]
+
+
+def test_resolution_is_stable_under_input_reordering() -> None:
+    """The property that makes the fix meaningful rather than merely different.
+
+    Before the evidence tiebreak this assertion was False: which settlement received a
+    contested invoice depended on enumeration order.
+    """
+    from model.predict import resolve
+
+    candidates = [
+        scored("A", "INV1", 0.9, date_delta=3.0),
+        scored("B", "INV1", 0.9, date_delta=1.0),
+        scored("C", "INV2", 0.9, date_delta=2.0, rule_score=0.5),
+        scored("D", "INV2", 0.9, date_delta=2.0, rule_score=0.9),
+    ]
+    forward = [c.row.entity_id for c in resolve(candidates)]
+    backward = [c.row.entity_id for c in resolve(list(reversed(candidates)))]
+    assert forward == backward == ["B", "D"]
+
+
+def test_the_deciding_rule_is_recorded_on_the_winner() -> None:
+    """Silently choosing is what produced thirteen misattributions nobody could explain."""
+    from model.predict import resolve
+
+    winner = resolve([scored("A", "INV1", 0.9, date_delta=9.0),
+                      scored("B", "INV1", 0.9, date_delta=1.0)])[0]
+    assert "probabilities equal" in winner.tiebreak
+    assert "date proximity" in winner.tiebreak
+
+
+def test_a_clear_probability_winner_records_no_tiebreak() -> None:
+    """A tiebreak note on an uncontested match would be noise in every audit record."""
+    from model.predict import resolve
+
+    winner = resolve([scored("A", "INV1", 0.9), scored("B", "INV1", 0.5)])[0]
+    assert winner.row.entity_id == "A"
+    assert winner.tiebreak == ""
+
+
+def test_the_id_backstop_is_named_as_the_weakest_answer() -> None:
+    """When every evidence component ties, the record should say so plainly rather than
+    imply a reason that does not exist."""
+    from model.predict import resolve
+
+    winner = resolve([scored("B", "INV1", 0.9), scored("A", "INV1", 0.9)])[0]
+    assert winner.row.entity_id == "A"
+    assert "entity id" in winner.tiebreak

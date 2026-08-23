@@ -88,6 +88,29 @@ places. Full rationale, including why there are three splits rather than two, is
 
 ![Reliability diagram](notes/reliability.png)
 
+#### The trade we made without knowing we were making it
+
+Isotonic was chosen over Platt on measured ECE, and it is the better calibrator. It is
+also a **step function**, and that has a consequence nobody looked for at the time:
+
+> **7,283 of 7,305 candidates -- 99.7% -- share an exact calibrated probability with
+> another candidate.**
+
+Excellent calibration, coarse discrimination. The probabilities say what they mean, and
+they say it in a small number of distinct values, so they cannot separate two
+near-identical candidates at all.
+
+That is invisible while you are looking at ECE and reliability diagrams. It surfaced only
+when a resolution defect was traced back: `resolve()` had been settling contested invoices
+by whichever candidate came first in a list, because the probability left 99.7% of contests
+undecided. Reproducible, and not principled -- and only the second is defensible in a
+financial control. Ties are now broken on evidence (date proximity, then rule tier, then
+invoice-link strength) with the deciding rule recorded in the audit record.
+
+**The honest roadmap line:** a finer-grained ranking signal is the obvious next
+improvement. Calibration and discrimination are different properties, this project
+optimised hard for the first, and the second is where the remaining coverage lives.
+
 #### Where it came from
 
 | | coverage | precision | notes |

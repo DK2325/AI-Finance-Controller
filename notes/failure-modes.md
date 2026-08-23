@@ -471,3 +471,64 @@ formality. Two symptoms mark them out:
     about correctness.
 
 Both feel like measurement, produce a number, and go in a report. Neither can be failed.
+
+---
+
+## Resolution by list order, and the two smaller defects behind it
+
+**Found by the reason-code actionability metric; `INVOICE_ALREADY_CLAIMED` scored 87.3%.**
+Thirteen settlements were told their invoice belonged elsewhere when truth says it was
+theirs.
+
+### The cause: ties, and there are almost nothing but ties
+
+```
+candidates sharing an exact calibrated probability   7,283 of 7,305   99.7%
+contested invoices decided by an exact tie              23 of   449    5.1%
+resolve() stable under input reordering                          False
+```
+
+Isotonic calibration is a step function. It gives excellent calibration and coarse
+discrimination, so "sort by probability" leaves almost every contest undecided, and
+`resolve()` settled them by whichever candidate came first in the list. **Ten of the
+thirteen were exact ties.** Reproducible, because candidate enumeration is deterministic --
+and not principled, which is the property that matters. "Why did this settlement get the
+invoice and not that one?" had no answer better than "it came first."
+
+**Fixed** by breaking ties on evidence -- date proximity, then rule tier, then
+invoice-link strength, with the ids as a deterministic backstop -- and recording the
+deciding rule on the winner. Stability under input reordering is now asserted in a test.
+
+### What the fix was worth, stated plainly
+
+| | before | after |
+|---|---|---|
+| matched | 2,497 | **2,497** |
+| coverage | 50.4954% | **50.4954%** |
+| `INVOICE_ALREADY_CLAIMED` actionable | 87.25% | 88.24% |
+| overall actionability | 97.88% | 97.92% |
+
+**One row of thirteen.** Coverage is byte-identical, and it was always going to be: a
+tiebreak *reallocates* a contested invoice, it does not create one. Both parties to a tie
+share a probability, so both clear the threshold or neither does.
+
+The reason to fix it was never the number. It was that a financial control should not
+decide who gets paid by list order, and that the sealed test set in Phase 7 would otherwise
+have been measured with a coin flip inside it -- leaving the most credible figure in the
+submission partly a function of enumeration order.
+
+Three of the surviving matches were decided by a tiebreak, and one of those fell all the
+way through to the id backstop. Its audit record says so: *"resolved on entity id"*, which
+is visibly the weakest available answer and is meant to look like one.
+
+### The two smaller defects, logged and not chased
+
+**One genuine model-ranking error.** In one of the thirteen, the settlement that took the
+invoice scored *strictly higher* -- the model preferred the wrong candidate on evidence.
+Not a resolution bug; a discrimination one, and the same root cause as the section above.
+
+**Two invoice-inference errors.** In two cases the settlement's best candidate carried a
+*different* invoice, which genuinely belonged to the settlement that claimed it. The reason
+code is technically true and still unactionable: it sends an operator to check a duplicate
+that is not one, when the real fault is that `core/invoices.py` inferred the wrong invoice
+through the narration. Left for Phase 7, sized at two rows in 4,945.
