@@ -92,6 +92,34 @@ time. Chaos mode injects corruption no builder in `datagen/` produces.
 **What does not mitigate it:** none of that proves the *distribution* is realistic. Only
 a run against real settlement data would, and that is out of scope.
 
+### Instruments that are wrong toward reassurance
+
+The recurring failure of this build, worth naming as a family rather than as four
+separate incidents. Every one of these produced a *better* number than the truth, which
+is the direction that does not get investigated:
+
+| what | how it flattered | how it surfaced |
+|---|---|---|
+| isotonic fitted and measured on the same split | ECE of exactly 0.00000 | the number was too good to be real |
+| the spike counted 429s as schema failures | reported 8% schema failure for a config whose every completed call was valid | separating transport from conformance |
+| the batching contamination classifier compared raw output to bare digits | filed a real cross-contamination as harmless mis-extraction | normalising before comparing |
+| the secret guard's own fixture | would have flagged itself, and the natural fix was to exempt the file most likely to grow a real key | assembling the fixture at runtime instead |
+
+**A near-miss, designed against rather than discovered (Phase 5).** A mock LLM provider
+with a hardcoded response shape belongs in exactly this family. The moment a prompt gains
+a field, the mock stops resembling the real response — and it does so *silently*, with
+every test still passing, because the mock is what the tests compare against. Coverage
+would look unchanged while the thing being covered had moved.
+
+`MockProvider` is therefore schema-driven: it builds its response by walking the JSON
+Schema it was handed, so it cannot fall behind the schema it is imitating. This one was
+caught by asking "how would this instrument lie to me?" before writing it, rather than by
+noticing an implausible number afterwards.
+
+**The general lesson:** a measurement that improves without a corresponding change to the
+thing being measured is a bug until proven otherwise. Three of the four above were found
+by disbelieving a good result.
+
 ---
 
 ## Known limitations of the system

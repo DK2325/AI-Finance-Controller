@@ -16,7 +16,7 @@ docstring and nothing else.
 | 2 eval harness, risk–coverage curve | ✅ |
 | 3 blocking, exact + fuzzy matching, features | ✅ |
 | 4 classifier, calibration, operating point | ✅ tagged `v1-working` |
-| **5 LLM exception layer + audit trail** | **← next, planned** |
+| **5 LLM exception layer + audit trail** | **← in progress, steps 1–3 of 7 done** |
 | 6 API, frontend, chaos mode | — |
 | 7 sealed test set, failure analysis | — |
 | 8 README, video, rehearsal | — |
@@ -51,6 +51,31 @@ Activate the venv and say:
 > **"Read notes/RESUME.md and start Phase 5."**
 
 That is enough. Everything decided is written down in `notes/`.
+
+---
+
+## Phase 5 progress
+
+| step | state |
+|---|---|
+| 1 reason-code enum, frozen ledger | ✅ `2fd55c4` |
+| 2 provider seam, mock as fault injector, rate limiter | ✅ `ce930fd` |
+| 3 provenance gate + the injection correction | ✅ `831f4c8` |
+| 4 three versioned prompts and their schemas | ← next |
+| 5 handler: batching, cache, retry-then-exception | |
+| 6 `enumerate_exceptions()` retrofit + audit records everywhere | |
+| 7 eval reports reason-code accuracy, ₹ per 1,000 rows, injection fixture | |
+
+**Steps 1–4 need no key and no network.** Step 5 is the first live call.
+
+**Open measurement from step 6:** the "43% of exceptions are deterministic" figure came
+from a probe, not from real exception objects — those did not exist in code until the
+step 6 retrofit. Re-measure it there. If it is 30% rather than 43%, LLM volume and run
+time both change, and the README line that carries it is already marked provisional.
+
+**Invariant to assert in step 6:** matched + exceptions == total settlements. Every
+settlement accounted for exactly once, no gaps, no double counting. That is what makes
+"the exceptions it could not resolve" an honest claim rather than a filtered list.
 
 ---
 
@@ -104,14 +129,24 @@ Three prompts, a provider seam, and a gate that makes the LLM's output verifiabl
 
 9. **Prompt-injection fixture.** Bank narrations are untrusted input.
 
-   ~~The provenance gate makes injection structurally hard — injected instructions are
-   not present in the source narration and so cannot pass a substring check.~~
-   **Wrong, corrected 23 Aug in `notes/injection.md`.** The narration is exactly where
-   injected text lives, so an injected UTR passes provenance honestly. What makes
-   injection inert is architecture rule 2: the extracted value only becomes a match if a
-   gateway settlement independently carries the same UTR *and* the classifier agrees on
-   amount, date and counterparty. Provenance catches the model's own mis-attribution;
-   layer ordering catches the adversary. Two controls, two threats.
+   **Provenance catches the model's error. Layer ordering catches the adversary's
+   intent.** Two controls, two threats — this is the framing for the README and the
+   pitch. The gate re-verifies each extracted field against its own source narration,
+   which catches mis-attribution (~1 in 200 when batching, envelope perfect). What makes
+   *injection* inert is architecture rule 2: an extracted UTR becomes a match only if a
+   gateway settlement independently carries it — the attacker does not control the
+   gateway file — and only if the classifier then agrees on amount, date and
+   counterparty.
+
+   The fixture is `Fault.OBEYS_INJECTION`: the mock *complies* with the attacker, and the
+   test asserts the system's output is unchanged. Assuming the model has already lost is
+   stronger than any pass rate against hostile prompts.
+
+   > **An earlier version of this file said the opposite** — that injected instructions
+   > are not in the source narration and so cannot pass a substring check. That was
+   > wrong: being in the narration is what makes text injection. Corrected 23 Aug;
+   > `notes/injection.md` carries the full trace and the residual risk. A test asserts
+   > the gate *passes* an injected UTR so the claim cannot come back by accident.
 
 **Exit criterion to hold to:** `--mock-llm` runs the whole pipeline with **no key
 present**, asserted by a test that unsets the environment variable.
