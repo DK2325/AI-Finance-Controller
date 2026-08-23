@@ -194,12 +194,28 @@ not a coverage instrument and was never designed to be.
 holds two runs with identical, perfect quality scores and different coverage, so the blind
 spot cannot come back silently.
 
-**It caught something on its first run.** A rule added to `parse.v3` — *"payment_method is
-`unknown` unless the narration indicates one; guessing is worse than declining"* — made the
-model decline 60 cases where the method is written literally in the narration.
-`payment_method` claim rate collapsed from 0.98 to **0.38**, with the failure rate still at
-0.0% throughout. Nothing else in the pipeline would have noticed. Corrected in `parse.v4`;
-claim rate back to 0.98, against a ground truth of 98 of 100 narrations naming a method.
+**It caught its author's error on its first run, which is the best argument for it.**
+
+A rule I wrote into `parse.v3` — *"payment_method is `unknown` unless the narration
+indicates one; guessing is worse than declining"* — made the model decline 60 cases where
+the method is written literally in the narration:
+
+| | claim rate | failure rate |
+|---|---|---|
+| `parse.v1` (no such rule) | 0.98 | 0.0% |
+| `parse.v3` (rule added) | **0.38** | 0.0% |
+| `parse.v4` (rule corrected) | 0.98 | 0.0% |
+
+Ground truth: 98 of 100 narrations name a method explicitly. Sixty per cent of the claims
+disappeared and **every failure rate read 0.0% throughout**. Nothing else in the pipeline
+would have noticed — not the schema check, not the provenance gate, not the eval harness.
+
+A control that catches the mistake of the person who wrote it, on the first run after
+being added, has earned its place more convincingly than any argument for it could.
+
+*(`payment_method` was deleted entirely a commit later, for an unrelated and stronger
+reason — see the theorem in the README. The metric's value is unaffected: it caught a real
+60% regression in a field that was live at the time.)*
 
 **The audit this prompts.** Every quality rate in the codebase, checked for a coverage
 counterpart:
@@ -257,3 +273,45 @@ So the honest statement of the finding is narrower than the headline:
 That change is not made now, because there is nothing in this dataset to justify it and an
 unexercised code path is a liability. It is written down so the decision is visible rather
 than absent, and so a reviewer who raises it finds it already answered.
+
+---
+
+## Open, unresolved: the decoder stall
+
+**Status at the end of Phase 5: understood in mechanism, not in cause. Not closed.**
+
+**What is known.** Under `json_schema` strict decoding, a call can stop producing content
+and emit whitespace until its token budget is gone. JSON grammar permits arbitrary
+whitespace between tokens, so the grammar is never violated and the decoder never
+advances. Measured directly: 23,973 characters returned, 23,780 of them whitespace, the
+content ending mid-object.
+
+**What was fixed.** One reproducible trigger — an array field, `list[str]` — stalled a
+particular batch 5 times out of 5, always at the same key, always at an identical byte
+count. Removing the array took that batch to 0 stalls in 5. That field is gone for
+unrelated reasons anyway.
+
+**What is not fixed, and is the open risk.** Stalls still occur on other batches with no
+array in the schema at all, at roughly **1 call in 5 or 6**, non-deterministically. The
+single retry has rescued **every one observed so far** — but "so far" is a few dozen calls,
+which is not a sample that supports a claim.
+
+**The specific Phase 7 risk.** A scale run is on the order of 600 calls rather than 30.
+Two things could happen that have not yet:
+
+1. The stall rate could be higher under sustained load than in short runs.
+2. A stall could survive **both** attempts — original and retry. That produces an
+   exception whose reason code says `LLM_MALFORMED_RESPONSE` with detail
+   `decoder stalled`, which is honest, but the underlying cause is one we do not fully
+   understand. An exception we cannot explain is worse than one we can.
+
+**Instrumentation in place for it.** `Usage.call_log` records `stalled` and `raw_chars` on
+every call, not only on failures, because a stall a retry rescues leaves no exception
+behind and its only other trace is the token bill. So the Phase 7 run will report the true
+stall rate whether or not any of them fail.
+
+**Mitigations considered and not taken.** A per-item token budget would cap what a stall
+costs — a batch of 20 at ~120 tokens each needs ~2,400, not the 5,000 currently allowed.
+That is a reasonable safety net and it is deliberately not being adopted as *the fix*,
+because it treats the cost of the symptom and would let the cause go uninvestigated. It
+remains available if the Phase 7 rate is bad.

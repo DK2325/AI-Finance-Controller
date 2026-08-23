@@ -7,18 +7,24 @@ with a default can be omitted, and an omitted field is indistinguishable from on
 model forgot. Forcing an explicit `null` makes "I found no UTR" a claim the model has to
 make rather than an absence we have to interpret.
 
+(That example is historical -- `utr` is no longer asked of the model at all. The
+rule still applies to every nullable field that remains.)
+
 **`extra="forbid"`**, which makes Pydantic emit `additionalProperties: false`. Under
 `json_schema` strict decoding that is a decode-time constraint, not a post-hoc check: the
 model cannot emit a field we did not ask for.
 
-**Every constrained vocabulary is a `Literal`.** GL account codes, payment methods, reason
-codes, suggested actions. This is the single most valuable thing the schema does, because
+**Every constrained vocabulary is a `Literal`.** GL account codes, reason codes,
+suggested actions. This is the single most valuable thing the schema does, because
 it turns a business rule into something the decoder physically cannot violate. A model
 free-texting a GL code produces a journal entry that looks right and posts to an account
 that does not exist.
 
 **Money is integer paise.** Never float, never a formatted string. `NUMERIC(14,2)` in the
 database, `int` here, and no arithmetic anywhere between the two.
+
+**No field survives here that a pattern could produce.** See `ParsedNarration` for the
+argument and the measurement; it is the reason this file is smaller than it was.
 """
 
 # No `from __future__ import annotations`: it turns annotations into strings that Pydantic
@@ -32,8 +38,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from llm.codes import JUDGEMENT_CODES
 
 # --------------------------------------------------------------- shared vocabularies
-
-PaymentMethod = Literal["upi", "neft", "imps", "rtgs", "card", "ach", "unknown"]
 
 # The chart of accounts. Deliberately small and closed.
 #
@@ -115,11 +119,20 @@ class ParsedNarration(Strict):
     that needs anything more than a plain regex. `core.normalize.extract_utrs` does this
     work at 100% for no tokens and no latency.
 
-    What is left is the complement, and that is not a coincidence: these are exactly the
-    fields the gate *cannot* verify by regex. A counterparty name has to be located inside
-    mangled text; a payment method has to be inferred from context; legibility is a
-    judgement. The model does the work that resists pattern matching, and the boundary
-    that decides what it keeps is the same boundary seen from the other side.
+    `payment_method` went the same way and for the same reason: the gate verified it by
+    scanning a keyword list, which is trivially reversible into an extractor, and nothing
+    in the matcher consumed it. Extracted, verified, and used by nothing.
+
+    THIS IS THE FIXED POINT, NOT MERELY THE CURRENT STATE.
+
+    `counterparty_name` and `parse_confidence` are what remain, and the narrowing stops
+    here for a reason that can be stated rather than assumed. Token-coverage can check
+    whether `ACME INDUSTRIES` is evidenced by a narration. It cannot answer *which two of
+    eight tokens are the company name* -- there is no way to run that check backwards to
+    produce a candidate. Verification and generation are different operations, and this
+    field is where they come apart.
+
+    So the model does the work no pattern can express, and nothing else was ever its job.
 
     Every field here is still re-verified against the source narration. The model's
     confidence in a field is not evidence for it.
@@ -130,7 +143,6 @@ class ParsedNarration(Strict):
         description="The paying party as written in the narration. Do not expand "
         "abbreviations and do not correct spelling."
     )
-    payment_method: PaymentMethod
     parse_confidence: float = Field(
         ge=0.0, le=1.0, description="How legible this narration was. Not how likely a match is."
     )

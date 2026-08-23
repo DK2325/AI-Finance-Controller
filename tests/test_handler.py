@@ -198,7 +198,7 @@ def test_editing_a_prompt_without_bumping_it_invalidates_the_cache() -> None:
     """The reason prompt identity carries a checksum and not just a version string."""
     request = load("parse").request(ROWS)
     edited = type(request)(
-        **{**request.__dict__, "prompt_version": "parse.v4+DIFFERENTHASH"}
+        **{**request.__dict__, "prompt_version": "parse.v5+DIFFERENTHASH"}
     )
     assert cache_key(request, "m") != cache_key(edited, "m")
 
@@ -269,7 +269,7 @@ def test_per_item_tokens_are_an_apportionment_of_the_call() -> None:
 def test_audit_fields_carry_prompt_and_model_identity() -> None:
     outcome = run().outcomes[0]
     fields = outcome.as_audit_fields()
-    assert fields["prompt_version"].startswith("parse.v4+")
+    assert fields["prompt_version"].startswith("parse.v5+")
     assert fields["model_name"] == "mock-1"
     assert fields["cache_hit"] is False
 
@@ -301,9 +301,7 @@ def test_a_model_that_obeys_the_attacker_changes_nothing_structural() -> None:
     # What matters: nothing here is a decision. The outcome carries fields and a reason
     # code slot, and no attribute by which an item could declare itself matched.
     assert not hasattr(outcome, "matched")
-    assert set(outcome.fields) <= {
-        "id", "counterparty_name", "payment_method", "parse_confidence",
-    }
+    assert set(outcome.fields) <= {"id", "counterparty_name", "parse_confidence"}
     # And identifiers are not the model's job at all any more -- regex extracts them at
     # 100% where the model managed 68%. An attacker's UTR never reaches this schema.
     assert "utr" not in outcome.fields

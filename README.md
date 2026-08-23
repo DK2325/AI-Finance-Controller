@@ -206,25 +206,37 @@ Across all 4,528 narrations in `data/train`, **zero** contain a UTR that needs m
 plain regex — no split digits, no line-wraps. So `utr` and `reference_number` were removed
 from the parse schema entirely. Same argument, same outcome.
 
-### The corollary, and where the line actually falls
+### Applied until it stops
 
-What survives is exactly what the gate *cannot* generate, and that is not a coincidence —
-it is the same boundary seen from the other side:
+Run the test over every field the parse job once asked for:
 
-| field | how the gate verifies | can that run in reverse? | who does it |
+| field | how the gate verifies it | can that run in reverse? | who does it |
 |---|---|---|---|
 | `utr` | find a 12-digit run | **yes** — that search *is* the extractor | regex |
-| `payment_method` | find a keyword | **yes** — scan the keyword list | *(under review)* |
-| `counterparty_name` | check the candidate's tokens are narration tokens | **no** | the model |
+| `reference_number` | find the digits in the narration | **yes** | regex |
+| `payment_method` | find a keyword from a fixed list | **yes** — scan the list | regex |
+| `counterparty_name` | check the candidate's tokens are narration tokens | **no** | **the model** |
+| `parse_confidence` | not a claim about the row | n/a | **the model** |
 
-The distinction is verification versus generation. Token-coverage can check whether
-`ACME INDUSTRIES` is evidenced by a narration; it cannot answer *which two of eight tokens
-are the company name*. There is no generative form of that check, and that is precisely
-the work that resists pattern matching.
+Three fields failed the test and were deleted. `payment_method` was the clearest case of
+all: extracted, verified, and consumed by nothing in the matcher — the definition of a
+field that should not exist.
 
-So the model does the part no regex can express, and everything else was never its job.
-Not because we decided the layers should be ordered that way, but because the gate we
-built to check the model turned out to describe the boundary.
+**And this is where the narrowing stops.** Not "for now" — the fixed point, for a reason
+that can be stated:
+
+> Token-coverage can check whether `ACME INDUSTRIES` is evidenced by a narration. It cannot
+> answer **which two of eight tokens are the company name.** There is no way to run that
+> check backwards to produce a candidate.
+
+Verification and generation are different operations, and `counterparty_name` is where they
+come apart. A regex can confirm a name once something proposes it; nothing but reading can
+propose it. That is the work the model is for, and after three rounds of deletion it is
+all that is left.
+
+So the layer ordering is not a policy we imposed on the architecture. **The gate we built
+to check the model turned out to describe the boundary**, and the model's job is the
+complement of what the gate can generate.
 
 ## Untrusted input, and what actually defends against it
 

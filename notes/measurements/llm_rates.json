@@ -1,7 +1,7 @@
 {
   "model": "nvidia/nemotron-3-super-120b-a12b",
   "n": 100,
-  "wall_seconds": 98.7,
+  "wall_seconds": 101.6,
   "batches": 5,
   "schema_failure_rate": 0.0,
   "overall_failure_rate": 0.02,
@@ -12,23 +12,18 @@
     "items": 100,
     "items_failed": 0,
     "item_failure_rate": 0.0,
-    "fields_checked": 196,
+    "fields_checked": 98,
     "fields_absent": 0,
     "field_failure_rate": 0.0,
     "failures_by_field": {},
-    "fields_empty": 4,
+    "fields_empty": 2,
     "claim_rate": 0.98,
     "claim_rate_by_field": {
-      "counterparty_name": 0.98,
-      "payment_method": 0.98
+      "counterparty_name": 0.98
     }
   },
   "provenance_by_field": {
     "counterparty_name": {
-      "empty": 2,
-      "present": 98
-    },
-    "payment_method": {
       "empty": 2,
       "present": 98
     }
@@ -37,56 +32,56 @@
     "calls": 5,
     "cached_calls": 0,
     "retries": 0,
-    "input_tokens": 8020,
-    "output_tokens": 5346,
-    "billed_tokens": 13366,
+    "input_tokens": 7619,
+    "output_tokens": 4454,
+    "billed_tokens": 12073,
     "tokens_served_from_cache": 0,
-    "seconds": 98.67
+    "seconds": 101.55
   },
   "call_log": [
     {
-      "seconds": 23.29,
-      "input_tokens": 1716,
-      "output_tokens": 1198,
+      "seconds": 33.07,
+      "input_tokens": 1635,
+      "output_tokens": 996,
       "truncated": false,
       "stalled": false,
-      "raw_chars": 3376,
+      "raw_chars": 2475,
       "retry": false
     },
     {
-      "seconds": 9.8,
-      "input_tokens": 1626,
-      "output_tokens": 1031,
+      "seconds": 11.24,
+      "input_tokens": 1547,
+      "output_tokens": 853,
       "truncated": false,
       "stalled": false,
-      "raw_chars": 2974,
+      "raw_chars": 2334,
       "retry": false
     },
     {
-      "seconds": 17.09,
-      "input_tokens": 1616,
-      "output_tokens": 1046,
+      "seconds": 12.13,
+      "input_tokens": 1533,
+      "output_tokens": 903,
       "truncated": false,
       "stalled": false,
-      "raw_chars": 3009,
+      "raw_chars": 2409,
       "retry": false
     },
     {
-      "seconds": 28.36,
-      "input_tokens": 1561,
-      "output_tokens": 1030,
+      "seconds": 29.75,
+      "input_tokens": 1481,
+      "output_tokens": 862,
       "truncated": false,
       "stalled": false,
-      "raw_chars": 3015,
+      "raw_chars": 2393,
       "retry": false
     },
     {
-      "seconds": 20.13,
-      "input_tokens": 1501,
-      "output_tokens": 1041,
+      "seconds": 15.35,
+      "input_tokens": 1423,
+      "output_tokens": 840,
       "truncated": false,
       "stalled": false,
-      "raw_chars": 3015,
+      "raw_chars": 2391,
       "retry": false
     }
   ],
@@ -102,6 +97,6 @@
       "detail": "parse_confidence 0.0 below floor 0.35"
     }
   ],
-  "tokens_per_item": 133.7,
+  "tokens_per_item": 120.7,
   "counterparty_failures_sample": []
 }
