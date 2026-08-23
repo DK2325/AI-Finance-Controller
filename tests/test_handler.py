@@ -198,7 +198,7 @@ def test_editing_a_prompt_without_bumping_it_invalidates_the_cache() -> None:
     """The reason prompt identity carries a checksum and not just a version string."""
     request = load("parse").request(ROWS)
     edited = type(request)(
-        **{**request.__dict__, "prompt_version": "parse.v1+DIFFERENTHASH"}
+        **{**request.__dict__, "prompt_version": "parse.v2+DIFFERENTHASH"}
     )
     assert cache_key(request, "m") != cache_key(edited, "m")
 
@@ -269,7 +269,7 @@ def test_per_item_tokens_are_an_apportionment_of_the_call() -> None:
 def test_audit_fields_carry_prompt_and_model_identity() -> None:
     outcome = run().outcomes[0]
     fields = outcome.as_audit_fields()
-    assert fields["prompt_version"].startswith("parse.v1+")
+    assert fields["prompt_version"].startswith("parse.v2+")
     assert fields["model_name"] == "mock-1"
     assert fields["cache_hit"] is False
 

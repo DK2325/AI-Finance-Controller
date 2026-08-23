@@ -120,6 +120,52 @@ noticing an implausible number afterwards.
 thing being measured is a bug until proven otherwise. Three of the four above were found
 by disbelieving a good result.
 
+### The worse one: an instrument that flattered a *diagnosis*
+
+Filed separately, because it is not the same failure and it is more dangerous.
+
+Every entry above flattered a **result**. A wrong result is eventually checked against
+something — a held-out split, a baseline, a reviewer asking where the number came from.
+A wrong **diagnosis** has no such check. It just gets acted on.
+
+**What happened (Phase 5, 23 Aug 2026).** A batch truncated at the 8,000-token ceiling.
+The provider reported *8,000 tokens produced 193 characters*. That reading is impossible —
+no tokeniser yields 0.02 characters per token — and instead of stopping on the impossible
+number, I built an explanation for it: the tokens must be going somewhere invisible, so
+the model must be reasoning despite `enable_thinking: false`, or looping on twenty
+near-identical narrations.
+
+I then confirmed the looping hypothesis with a three-arm experiment across nine live
+calls. The experiment agreed. It also had a bug that made one arm identical to its
+control, which nobody would have caught because the arm agreed too.
+
+One call that printed the response body ended it. The response was **23,973 characters,
+23,780 of them trailing whitespace**. There was no loop and no hidden reasoning. The
+constrained decoder stalls emitting spaces and newlines — legal JSON whitespace, so the
+grammar is never violated and the decoder never advances — until the budget is gone.
+
+**Why the contradiction was invisible.** `NvidiaProvider` did `.strip()` on the response
+before recording anything. The 23,780 characters that would have explained everything were
+destroyed at the boundary, and what survived was a plausible, impossible number.
+
+**The fix, and the general form of it.** `LLMResponse.raw_chars` records the length before
+stripping, and `stalled` distinguishes a stall from an honest overrun — a real truncation
+fills its budget with content, so raw length tracks token count; a stall does not.
+
+> **Normalisation at a boundary destroys the evidence you need when the thing behind that
+> boundary misbehaves.** Anywhere the pipeline normalises before recording, keep the raw
+> value alongside the clean one.
+
+Places that rule now applies, and should keep applying: response text before `.strip()`
+(done); narration text before `normalize_narration()`; amounts before `to_paise()`; dates
+before `parse_date()`. Each of those is a boundary where a malformed input becomes a
+well-formed value, and where the malformation is exactly what a future investigation will
+need.
+
+**The distinguishing question**, worth asking before building an explanation for any
+number: *is this reading physically possible?* Two experiments were spent because it was
+not, and nobody asked.
+
 ---
 
 ## Known limitations of the system

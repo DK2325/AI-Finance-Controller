@@ -1,7 +1,7 @@
 {
   "model": "nvidia/nemotron-3-super-120b-a12b",
   "n": 100,
-  "wall_seconds": 185.7,
+  "wall_seconds": 62.8,
   "batches": 5,
   "schema_failure_rate": 0.0,
   "overall_failure_rate": 0.0,
@@ -10,7 +10,7 @@
     "items": 100,
     "items_failed": 0,
     "item_failure_rate": 0.0,
-    "fields_checked": 366,
+    "fields_checked": 280,
     "fields_absent": 0,
     "field_failure_rate": 0.0,
     "by_field": {}
@@ -23,73 +23,63 @@
       "empty": 2,
       "present": 98
     },
-    "reference_number[0]": {
-      "empty": 10,
-      "present": 90
-    },
-    "reference_number[1]": {
-      "present": 15
+    "reference_number": {
+      "empty": 66,
+      "present": 34
     },
     "utr": {
-      "empty": 37,
-      "present": 63
+      "empty": 52,
+      "present": 48
     }
   },
   "usage": {
-    "calls": 6,
+    "calls": 5,
     "cached_calls": 0,
-    "retries": 1,
-    "input_tokens": 8651,
-    "output_tokens": 17256,
-    "billed_tokens": 25907,
+    "retries": 0,
+    "input_tokens": 7429,
+    "output_tokens": 7776,
+    "billed_tokens": 15205,
     "tokens_served_from_cache": 0,
-    "seconds": 185.68
+    "seconds": 62.75
   },
   "call_log": [
     {
-      "seconds": 69.14,
-      "input_tokens": 1551,
-      "output_tokens": 2028,
+      "seconds": 12.49,
+      "input_tokens": 1600,
+      "output_tokens": 1679,
       "truncated": false,
       "retry": false
     },
     {
-      "seconds": 52.22,
-      "input_tokens": 1464,
-      "output_tokens": 8000,
-      "truncated": true,
-      "retry": false
-    },
-    {
-      "seconds": 19.05,
-      "input_tokens": 1464,
-      "output_tokens": 1972,
-      "truncated": false,
-      "retry": true
-    },
-    {
-      "seconds": 11.38,
-      "input_tokens": 1448,
-      "output_tokens": 1735,
+      "seconds": 9.07,
+      "input_tokens": 1513,
+      "output_tokens": 1592,
       "truncated": false,
       "retry": false
     },
     {
-      "seconds": 12.95,
-      "input_tokens": 1396,
-      "output_tokens": 1809,
+      "seconds": 14.17,
+      "input_tokens": 1497,
+      "output_tokens": 1594,
       "truncated": false,
       "retry": false
     },
     {
-      "seconds": 20.96,
-      "input_tokens": 1328,
-      "output_tokens": 1712,
+      "seconds": 17.05,
+      "input_tokens": 1444,
+      "output_tokens": 1379,
+      "truncated": false,
+      "retry": false
+    },
+    {
+      "seconds": 9.98,
+      "input_tokens": 1375,
+      "output_tokens": 1532,
       "truncated": false,
       "retry": false
     }
   ],
   "failure_details": [],
-  "tokens_per_item": 259.1,
+  "tokens_per_item": 152.1,
   "counterparty_failures_sample": []
 }

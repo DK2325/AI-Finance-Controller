@@ -113,8 +113,16 @@ class ParsedNarration(Strict):
     utr: str | None = Field(
         description="The 12-digit UTR if one is present in this narration, else null."
     )
-    reference_number: list[str] = Field(
-        description="Any other reference numbers present, exactly as written. Empty if none."
+    # A scalar, not a list, and the reason is measured rather than stylistic.
+    #
+    # As `list[str]` this field stalled the constrained decoder: 5 runs out of 5 stopped
+    # at exactly this key and emitted 23,780 characters of whitespace until the 8,000
+    # token budget was gone. JSON grammar permits arbitrary whitespace between tokens, so
+    # the decoder never violated the schema and never advanced. Removing the array
+    # eliminated it -- 0 stalls in 5, and 1,454 tokens against 8,000.
+    # See notes/measurements/array_stall.json.
+    reference_number: str | None = Field(
+        description="One other reference number if present, exactly as written, else null."
     )
     parse_confidence: float = Field(
         ge=0.0, le=1.0, description="How legible this narration was. Not how likely a match is."
