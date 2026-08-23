@@ -33,6 +33,39 @@ Three things that must not be re-derived or accidentally assumed:
 3. **LLM-bound exceptions fell 1,198 -> 459** after the resolver fix. Batch 20 and a pool of
    8 are now over-provisioned rather than tight. Do not re-tune; do not re-derive.
 
+## Phase 7 — the scale run happens locally, not on Railway
+
+**The 25,000-row scale run is a local run. Report its numbers from there.**
+
+The Railway trial gives **1 GB RAM, 2 vCPU, 1 GB disk**. That is enough for what the
+deployed instance is actually for — serving the seeded run and the one-click demo batch —
+and it is not enough to generate 25,000 rows, train against them, and hold the candidate
+set in memory while scoring.
+
+Concretely, the shapes that do not fit:
+
+| | `data/train` today | at 25,000 settlements |
+|---|---|---|
+| candidates held in memory | 7,305 | ~37,000, each with a 23-feature dict |
+| generated batch on disk | 2.1 MB | ~11 MB |
+| run artifacts (predictions + exceptions) | 1.3 MB | ~7 MB |
+
+None of that is large in absolute terms, but it lands on a 1 GB box that is also running
+Postgres and serving HTTP, and a scale run that gets OOM-killed halfway produces no number
+at all. There is nothing to gain by proving throughput on the smallest machine in the
+project.
+
+**So the split is:**
+
+- **Locally** — generate the 25,000-row batch, break the seal on `data/test`, run at
+  scale, and record throughput, the stall rate, cost, and the held-out numbers.
+- **On Railway** — the seeded run and the demo batch, unchanged. Nothing about the
+  deployment needs to change for Phase 7.
+
+**When reporting throughput, say which machine.** A rows-per-second figure with no hardware
+beside it is not a measurement, and the honest form is "25,000 rows in Xs on a laptop"
+rather than an unqualified number that a reader will assume describes the live service.
+
 ## Headline numbers as of now
 
 ```
