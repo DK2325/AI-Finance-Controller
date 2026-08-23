@@ -193,6 +193,14 @@ then *described itself inaccurately*, and the description is what the next perso
 A wrong number gets checked against something eventually. A wrong explanation gets believed
 and followed.
 
+**A fifth instance turned up at Phase 7, in a different form: not an error message but a
+defect estimate.** A note sizing an invoice-inference bug at "two rows in 4,945" measured
+almost correctly -- five in 4,950 out of sample -- while naming the wrong cause for three of
+the five. Written up under *The two smaller defects, logged and not chased*. It is listed
+here because it extends the pattern beyond error strings: **anything that explains a number
+can name the wrong investigation, and being roughly right about the number is what stops
+anyone re-examining the explanation.**
+
 **The fix is the same shape every time: classify rather than generalise.** The database
 error handler now separates unreachable, refused-by-constraint and schema-mismatch, because
 those are three different investigations and one label served none of them. The token
@@ -376,11 +384,21 @@ whose invoice was taken on the way to the decline, and nothing in the risk-cover
 accounts for that cost. All three sit at an identical calibrated probability, which is the
 isotonic step function's coarseness surfacing in a third place.
 
-**Not fixed here.** Applying the threshold before resolution, or releasing invoices held by
-below-threshold candidates, would change every number in `notes/phase-7-report.md`, and
-making that change after reading the sealed set is exactly what the pre-commitment forbids.
-It is logged with its measurement so the fix can be made and re-measured honestly against a
-fresh batch.
+**Not fixed, and the reason is not an oversight.** Two things make fixing it here the wrong
+move, and both are worth stating so that "not fixed" does not read as "not noticed":
+
+1.  Applying the threshold before resolution, or releasing invoices held by below-threshold
+    candidates, would change every number in `notes/phase-7-report.md`. The report would
+    then describe a system that no longer exists.
+2.  **A fix validated against the batch that exposed it is a fix tuned to that batch.**
+    Three cases on one dataset is enough to establish that the defect is real and nowhere
+    near enough to establish that a given reordering improves anything. Measuring the
+    remedy on `data/test` would make its apparent benefit a property of the rows that
+    revealed the problem.
+
+So it is logged with its measurement and belongs against a fresh batch, after submission.
+The sequence that keeps it honest is: generate a new batch, reproduce the defect on it,
+change `resolve()`, and re-measure there -- not here.
 
 ### The other two are the false matches, seen from the other side
 
@@ -390,6 +408,13 @@ that appear among the three false matches. **A false match and a spurious
 does not own, and the rightful owner is then sent to chase a duplicate that does not exist.
 The wrong money and the wasted operator time are the same defect billed to two different
 people, which is worth knowing before treating them as independent line items.
+
+**Concretely: the false-match count and the exception count are not independent, and
+anywhere both appear they should not be added or reasoned about separately.** On the sealed
+set, 2 of the 3 false matches each also generate one of the 1,836 exceptions. Improving
+resolution would reduce both at once, and a cost model that treats "3 false matches" and
+"1,836 exceptions to review" as separate quantities double-counts the overlap. It is small
+here -- 2 rows -- and the structure, not the size, is the reason to state it.
 
 ### Confidence 1.0 does not mean safe
 
@@ -765,6 +790,18 @@ through the narration. Left for Phase 7, sized at two rows in 4,945.
 the cause is not invoice inference at all. See *An abstention that is not free* below.
 Sizing a defect before finding its cause put the wrong name on it. The number was roughly
 right and the diagnosis was wrong, which is the more expensive half to get wrong.
+
+**This is the fifth instance of the pattern in *The same error, four times* above, and the
+first in an estimate rather than an error string.** The four recorded there were messages
+that named the wrong investigation. This was a defect note that named the wrong cause while
+sizing it almost correctly -- two rows against a measured five. The sizing being roughly
+right is what made it safe to leave alone, and the diagnosis being wrong is what would have
+sent the fix into `core/invoices.py`, where three of the five cases have nothing to fix.
+
+The generalisation is worth carrying: **a number that happens to be right can conceal a
+wrong explanation, and the explanation is the half that gets acted on.** A wrong number
+eventually fails a check. A wrong cause attached to a right number is never checked at all,
+because the number keeps agreeing.
 
 ---
 
