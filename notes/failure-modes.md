@@ -437,3 +437,37 @@ would *do* on the strength of it. `NO_CANDIDATE` and `LOW_CONFIDENCE` send an in
 to two different places, so the difference between them is not a labelling nicety — it is
 the entire value of the record. Every reason code's text has been re-read against that
 question.
+
+---
+
+## A question with no possible bad answer is not a metric
+
+The same error, made twice in Phase 5 in different clothes. Worth stating once as a class.
+
+**First: reason-code agreement.** The `reason` prompt hands the model
+`system_reason_code` and the metric scored whether the model's tag matched it. 100 out of
+100. It measured transcription, because one party had been told the other's answer.
+
+**Second: reason-code "accuracy" as first designed.** The intended check was *"did the
+system pick the right code given what it knew?"* Every code would have scored correct, and
+not by luck — each code is a *true statement about our own computation*. `BELOW_THRESHOLD`
+says the best candidate scored below the threshold, and it always did. `NO_CANDIDATE` says
+no candidate survived, and none had. The question was unfalsifiable by construction.
+
+**What made the second one a real metric** was changing the question from one about our
+internal state to one about a consequence in the world:
+
+> Does this code send the operator to the right place?
+
+That can fail, and it did: `AMBIGUOUS_CANDIDATES` scores 21% actionable, and
+`INVOICE_ALREADY_CLAIMED` 87%, surfacing a resolution defect that nothing else had seen.
+
+**The diagnostic to apply to any proposed metric:** *what result would count as bad, and
+could it actually occur?* If the answer is "none" or "not really", the metric is a
+formality. Two symptoms mark them out:
+
+*   **the mirror** — comparing two things where one was told the other's answer;
+*   **the tautology** — asking whether a system did what it did, phrased as a question
+    about correctness.
+
+Both feel like measurement, produce a number, and go in a report. Neither can be failed.

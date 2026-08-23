@@ -260,6 +260,52 @@ from the model's 68% to a regex's 100%.
 That is the measurable form of the same argument. Work given to the wrong layer is not
 merely more expensive; it is more expensive *and* worse.
 
+## What the exception queue costs, and what its reasons are worth
+
+**Reason-code accuracy is scored against ground truth, and the question is deliberately one
+the system can fail:** not *"did it pick the right code given what it knew"* — by that
+standard every code is correct, since each is a true statement about our own computation —
+but **"does this code send the operator to the right place?"**
+
+| reason code | actionable | |
+|---|---|---|
+| `NO_CANDIDATE` | **100.0%** | 296 / 296 |
+| `NO_INVOICE_LINK` | **100.0%** | 852 / 852 |
+| `BELOW_THRESHOLD` | 98.6% | 1153 / 1170 |
+| `INVOICE_ALREADY_CLAIMED` | 87.3% | 89 / 102 |
+| `AMBIGUOUS_CANDIDATES` | 21.4% | 6 / 28 |
+| **overall** | **97.9%** | 2396 / 2448 |
+
+**The 21.4% is not a labelling defect and is not presented as one.** Those exceptions send
+an operator to review candidates, none of which is the true credit — because blocking never
+retrieved it. *No code the system could have chosen would have been actionable, since the
+system cannot know what it did not retrieve.* That number measures **blocking recall**, and
+the remedy is candidate generation rather than a different label.
+
+`INVOICE_ALREADY_CLAIMED` at 87.3% is a different thing entirely: a real resolution defect,
+diagnosed in `notes/failure-modes.md`. The two are kept apart permanently, because folding
+them into the 97.9% aggregate would have hidden a bug behind a structural limit.
+
+### Inference cost: provider choice is not a cost decision
+
+| | cheapest | dearest |
+|---|---|---|
+| per 1,000 settlements | ₹1.83 | ₹3.03 |
+| a 25,000-row monthly run | ₹45.79 | ₹75.79 |
+
+The same open-weight model is served at rates differing 1.6× on output tokens, which
+sounds significant until it is denominated: **the difference between the cheapest and
+dearest provider across a 25,000-row monthly reconciliation is ₹30.** Provider selection
+can therefore be made on latency, reliability, or data residency **with no cost trade-off
+worth modelling** — and any of the three would still be affordable at five times the price.
+
+51.06% of exceptions never reach a model at all, which is the largest single reason the
+figure is this small.
+
+> *Tokens measured on NVIDIA's free hosted endpoint; priced against published third-party
+> rates as of 23 August 2026; not billed.* Sources and dates in
+> [notes/pricing.md](notes/pricing.md).
+
 ## The audit trail names where the evidence ran out
 
 Every settlement produces exactly one audit record, matched or not. Declining to match is
