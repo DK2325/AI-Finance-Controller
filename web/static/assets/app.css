@@ -350,3 +350,52 @@ body {
 .job-bar { height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; }
 .job-fill { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
 .job-note { font-size: 13.5px; color: var(--ink-2); margin-top: 9px; }
+
+
+/* ---------------------------------------------------------------- chaos */
+
+.chaos-input { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.chaos-input input {
+  flex: 1 1 380px; font: inherit; font-size: 15px; padding: 11px 13px;
+  border: 1px solid var(--line); border-radius: 8px;
+}
+.chaos-input input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Real examples, one click away. A panelist typing into a blank box does not know what
+   shape of instruction works, and the demo depends on their first attempt succeeding. */
+.chips { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 10px; }
+.chip {
+  font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: #fff; color: var(--ink-2); cursor: pointer;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+.chaos-verdict { margin-top: 20px; padding: 16px 18px; border-radius: 9px; font-size: 15px; }
+.chaos-verdict.pass { background: #e8f6ef; border: 1px solid #a8ddc3; color: #08512f; }
+.chaos-verdict.fail { background: #fdeceb; border: 1px solid #f3c2be; color: #7a1c16; }
+.chaos-verdict strong { display: block; font-size: 16px; margin-bottom: 4px; }
+
+.chaos-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14.5px; }
+.chaos-table th { text-align: right; padding: 8px 12px; font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); }
+.chaos-table th:first-child { text-align: left; }
+.chaos-table td { padding: 9px 12px; border-top: 1px solid var(--line);
+  text-align: right; font-variant-numeric: tabular-nums; }
+.chaos-table td:first-child { text-align: left; font-weight: 550; }
+.chaos-table tr.corrupted td { background: #fffaf3; }
+.chaos-table .delta { font-size: 12.5px; color: var(--ink-3); display: block; }
+
+.chaos-applied { margin-top: 16px; display: grid; gap: 9px; }
+.applied {
+  border: 1px solid var(--line); border-left: 3px solid var(--warn);
+  border-radius: 7px; padding: 12px 14px; background: #fffaf3;
+}
+.applied h4 { margin: 0 0 3px; font-size: 14px; font-family: ui-monospace, monospace; }
+.applied p { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+.applied .breaks { margin-top: 5px; font-size: 13px; color: var(--ink-3); }
+.applied .story { margin-top: 8px; padding: 9px 11px; background: #fff; border-radius: 6px;
+  border: 1px solid var(--line); font-size: 13px; color: var(--ink-2); }
+
+.count-caveat { margin-top: 12px; font-size: 13.5px; color: var(--ink-2);
+  background: #f2f5fb; border-left: 3px solid var(--accent);
+  padding: 11px 14px; border-radius: 0 6px 6px 0; }

@@ -374,6 +374,70 @@ Two consequences, and the second is the point:
     than by reading an architecture diagram and taking it on trust. Every screen that
     renders instantly is a screen no model touched.
 
+## Breaking it on purpose
+
+Eight corruptions the generator never produces, injected into a loaded batch and scored
+against the same answer key as the clean one. **Measured on `data/demo`, every corruption
+applied to 100% of bank rows:**
+
+| corruption | matched | coverage | wrong matches |
+|---|---|---|---|
+| *(clean baseline)* | 327 | 66.06% | **0** |
+| unmodelled fee structure | 28 | 5.66% | **0** |
+| two payouts merged into one credit | 83 | 16.77% | **0** |
+| narrations truncated to 24 chars | 100 | 20.20% | **0** |
+| a third bank's narration grammar | 146 | 29.49% | **0** |
+| payer names transliterated | 146 | 29.49% | **0** |
+| value dates reported a day early | 161 | 32.53% | **0** |
+| UTRs split across groups | 270 | 54.55% | **0** |
+| amounts written into the narration | 333 | 67.27% | **0** |
+
+**Coverage falls as far as 5.66%. Precision holds, with zero wrong matches in all eight.**
+
+That is the entire claim, demonstrated rather than asserted: under conditions it was never
+built for, the system stops matching rather than starts guessing. A graceful failure proves
+the thesis as well as a success does — and the failure that would matter is the opposite
+one, coverage holding while precision collapses, because that is money posted against the
+wrong invoice with no warning.
+
+**Judged on the count of wrong matches, not the percentage.** At 5.66% coverage a precision
+figure is a ratio over 28 rows; 1 wrong in 3 is 66.7% and means almost nothing. The count
+is the honest quantity.
+
+### One corruption makes matching *easier*, and it stays in
+
+`currency_symbol_noise` — amounts written into the narration with symbols — takes coverage
+from 66.06% to **67.27%**. Writing the amount into the narration hands invoice inference a
+signal the clean row did not have.
+
+It is kept, and named. **A corruption suite containing only corruptions that hurt is a
+suite selected to make the system look robust**, and a reviewer who noticed that would be
+right to discount the whole table. Not every unmodelled change is an attack; some
+real-world format noise is accidentally informative, and that is worth knowing too.
+
+### The one that demonstrates our own documented limitation
+
+`wrapped_utr` splits a UTR across groups, the way a fixed-width export does. That is
+*exactly* the case [notes/failure-modes.md](notes/failure-modes.md) names as where a
+language model would beat the deterministic extractor — and where the provenance gate's
+whole-digit-run rule would reject the model's correct answer, because `3000 0000 4412` is
+not a 12-digit run.
+
+The chaos screen says so when you run it. **A written-down limitation you can demonstrate
+on demand is worth more than one you can only describe.**
+
+### Free text, and which path answered
+
+A corruption is named in plain English. A deterministic keyword mapping is tried first and
+answers almost everything with no network; the model is consulted **only** where the
+keywords find nothing, because it cannot improve a correct answer and every call is a
+chance to fail during a live demonstration. Any failure falls back to the deterministic
+result.
+
+The response reports which path answered — `keyword`, `model`, `default` or `fallback`. And
+the model can only *select*: its response schema is a closed set of corruptions that already
+exist, so it cannot invent behaviour. Same principle as everywhere else the model appears.
+
 ## Untrusted input, and what actually defends against it
 
 Bank narrations are free text written by systems we do not control. They are untrusted

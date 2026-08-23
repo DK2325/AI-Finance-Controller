@@ -322,6 +322,7 @@ function switchTo(name) {
   );
   if (name === "dashboard") render(state.data);
   else if (name === "review") renderReview();
+  else if (name === "chaos") renderChaos();
   else renderUpload();
 }
 
@@ -651,4 +652,154 @@ async function submitRun(payload) {
       setJob("Failed", 0, status.error || "unknown error");
     }
   }, 900);
+}
+
+/* ==========================================================================
+ * Chaos: break it on purpose, and show that it declined rather than guessed.
+ * ========================================================================== */
+
+/* Some corruptions carry a story worth telling when a panelist picks them. wrapped_utr in
+   particular injects the exact case notes/failure-modes.md names as the one where a model
+   would beat the regex -- and where the provenance gate would reject the model's correct
+   answer. A written-down limitation you can demonstrate on demand is stronger than one you
+   can only describe, so the screen tells it rather than showing a bare number. */
+const CHAOS_STORIES = {
+  wrapped_utr:
+    "This is the case this project documents as its own limitation. A UTR split across " +
+    "groups is exactly where a language model would beat the regex — and the provenance " +
+    "gate's whole-digit-run rule would reject the model's correct answer, because " +
+    "'3000 0000 4412' is not a 12-digit run. The deterministic UTR pass goes blind here " +
+    "and the fuzzy passes carry what they can. See notes/failure-modes.md.",
+  currency_symbol_noise:
+    "Measured, and this one makes matching very slightly EASIER — writing the amount into " +
+    "the narration hands invoice inference a signal the clean row did not have. It stays " +
+    "in the suite because a corruption set containing only corruptions that hurt is a set " +
+    "selected to make the system look robust.",
+  merged_credits:
+    "The dangerous shape: two payouts arriving as one credit with no batch marker looks " +
+    "exactly like a legitimate batched settlement, which the system is built to match.",
+};
+
+let chaosExamples = [];
+
+async function renderChaos() {
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+  app.appendChild(document.getElementById("chaos-template").content.cloneNode(true));
+
+  const input = document.getElementById("chaos-text");
+  const chips = document.getElementById("chaos-chips");
+
+  if (!chaosExamples.length) {
+    try {
+      const body = await (await fetch("/api/chaos/corruptions")).json();
+      chaosExamples = body.examples || [];
+    } catch {
+      chaosExamples = ["swap the date format", "truncate the narrations"];
+    }
+  }
+
+  chips.innerHTML = chaosExamples
+    .map((e) => '<button type="button" class="chip">' + e + "</button>")
+    .join("");
+  chips.querySelectorAll(".chip").forEach((chip) =>
+    chip.addEventListener("click", () => {
+      input.value = chip.textContent;
+      runChaos();
+    })
+  );
+
+  document.getElementById("chaos-run").addEventListener("click", runChaos);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") runChaos();
+  });
+}
+
+async function runChaos() {
+  const text = document.getElementById("chaos-text").value.trim();
+  const result = document.getElementById("chaos-result");
+  result.hidden = true;
+
+  setJob("Interpreting the request…", 0.1, "");
+
+  const job = await (
+    await fetch("/api/jobs/chaos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batch_dir: "data/demo", corruption: text }),
+    })
+  ).json();
+
+  if (!job.job_id) return setJob("Refused", 0, job.detail || "unknown error");
+
+  const poll = setInterval(async () => {
+    const status = await (await fetch("/api/jobs/" + job.job_id)).json();
+    setJob(status.step || status.status, status.progress || 0.3, "");
+
+    if (status.status === "done") {
+      clearInterval(poll);
+      setJob("Done", 1, "");
+      result.hidden = false;
+      result.innerHTML = chaosHtml(status.result);
+    } else if (status.status === "failed") {
+      clearInterval(poll);
+      setJob("Failed", 0, status.error || "unknown error");
+    }
+  }, 800);
+}
+
+function chaosHtml(r) {
+  const before = r.before;
+  const after = r.after;
+  const v = r.verdict;
+
+  const applied = (r.applied || [])
+    .map((a) => {
+      const story = CHAOS_STORIES[a.name]
+        ? '<div class="story">' + CHAOS_STORIES[a.name] + "</div>"
+        : "";
+      return (
+        '<div class="applied"><h4>' + a.name + "</h4>" +
+        "<p>" + a.description + " — applied to " + fmtInt(a.rows_touched) + " bank rows</p>" +
+        '<div class="breaks">Breaks: ' + a.what_it_breaks + "</div>" + story + "</div>"
+      );
+    })
+    .join("");
+
+  const coverageDelta = (after.coverage - before.coverage) * 100;
+  const falseDelta = after.false_matches - before.false_matches;
+
+  return (
+    '<div class="chaos-verdict ' + (v.graceful ? "pass" : "fail") + '">' +
+    "<strong>" + (v.graceful ? "Degraded gracefully" : "Mis-matched under corruption") +
+    "</strong>" + v.reading + "</div>" +
+
+    '<table class="chaos-table"><thead><tr><th>Batch</th><th>Matched</th>' +
+    "<th>Coverage</th><th>Wrong matches</th><th>Mis-posted</th></tr></thead><tbody>" +
+    "<tr><td>Clean</td><td>" + fmtInt(before.matched) + "</td><td>" +
+    fmtPct(before.coverage) + "</td><td>" + before.false_matches + "</td><td>" +
+    rupees(before.wrong_money_paise) + "</td></tr>" +
+    '<tr class="corrupted"><td>Corrupted</td><td>' + fmtInt(after.matched) +
+    "</td><td>" + fmtPct(after.coverage) +
+    '<span class="delta">' + coverageDelta.toFixed(1) + " pts</span></td><td>" +
+    after.false_matches +
+    '<span class="delta">' + (falseDelta >= 0 ? "+" : "") + falseDelta + "</span></td><td>" +
+    rupees(after.wrong_money_paise) + "</td></tr></tbody></table>" +
+
+    /* The count carries the verdict, not the percentage. At low coverage a precision
+       figure is a ratio over a handful of rows and a reviewer should not lean on it. */
+    '<div class="count-caveat"><strong>Judged on the count of wrong matches, not on ' +
+    "precision.</strong> At " + fmtPct(after.coverage) + " coverage the precision figure " +
+    "is a ratio over " + fmtInt(after.matched) + " rows — 1 wrong in 3 is 66.7% and means " +
+    "almost nothing. " + after.false_matches + " wrong " +
+    (after.false_matches === 1 ? "match is" : "matches are") + " the quantity that matters." +
+    "</div>" +
+
+    '<div class="chaos-applied">' + applied + "</div>" +
+
+    '<p class="hint" style="margin-top:14px">Request read as <code>' +
+    (r.spec.corruptions || []).join(", ") + "</code> at " +
+    Math.round((r.spec.share || 0) * 100) + "% of bank rows, interpreted by <strong>" +
+    r.spec.interpreted_by + "</strong>.</p>"
+  );
 }

@@ -324,6 +324,83 @@ def submit_recon(request: ReconRequest) -> dict:
     return job.as_dict()
 
 
+class ChaosRequest(BaseModel):
+    batch_dir: str = Field(default=DEMO_BATCH)
+    corruption: str = Field(default="", description="Free text, or a corruption name.")
+    share: float | None = None
+    use_model: bool = True
+
+
+@app.get("/api/chaos/corruptions")
+def chaos_corruptions() -> dict:
+    """The closed set, with what each one breaks.
+
+    Served so the UI can offer real examples rather than an empty box: a panelist typing
+    into a blank field does not know what shape of instruction works, and the demo depends
+    on their first attempt succeeding.
+    """
+    from core.chaos import CORRUPTIONS
+
+    return {
+        "corruptions": [
+            {"name": name, "description": description, "what_it_breaks": breaks}
+            for name, (_, description, breaks) in CORRUPTIONS.items()
+        ],
+        "examples": [
+            "swap the date format",
+            "split the UTRs across lines",
+            "a bank that deducts an extra fee",
+            "truncate the narrations",
+            "corrupt 30% of rows with a different bank layout",
+            "merge two payments into one credit",
+        ],
+    }
+
+
+@app.post("/api/jobs/chaos")
+def submit_chaos(request: ChaosRequest) -> dict:
+    """Inject unmodelled corruption and score both sides against the same answer key.
+
+    A job rather than a blocking call: it runs the full pipeline twice.
+    """
+    batch = Path(request.batch_dir)
+    if not batch.is_dir():
+        raise HTTPException(status_code=400, detail=f"no batch at {request.batch_dir}")
+
+    def work(job: Job) -> dict:
+        from core.chaos import apply_chaos
+        from core.pipeline import load_sources
+        from llm.chaos_spec import interpret
+        from model.artifact import Artifact
+        from model.chaos_run import compare, verdict
+
+        job.step = "interpreting the request"
+        spec = interpret(request.corruption, use_model=request.use_model)
+        if request.share is not None:
+            spec.share = max(0.05, min(1.0, request.share))
+
+        job.step = "corrupting the bank statement"
+        job.progress = 0.2
+        artifact = Artifact.load(DEMO_MODEL)
+        clean = load_sources(batch)
+        corrupted, applied = apply_chaos(clean, spec)
+
+        job.step = "reconciling both sides"
+        job.progress = 0.4
+        before, after = compare(clean, corrupted, artifact, batch)
+
+        job.step = "done"
+        return {
+            "spec": spec.as_dict(),
+            "applied": [a.as_dict() for a in applied],
+            "before": before,
+            "after": after,
+            "verdict": verdict(before, after),
+        }
+
+    return REGISTRY.submit("chaos", work).as_dict()
+
+
 @app.get("/api/jobs/{job_id}")
 def job_status(job_id: str) -> dict:
     job = REGISTRY.get(job_id)

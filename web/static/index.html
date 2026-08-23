@@ -20,6 +20,7 @@
   <button type="button" class="tab" data-screen="dashboard" aria-current="true">Dashboard</button>
   <button type="button" class="tab" data-screen="review">Review queue</button>
   <button type="button" class="tab" data-screen="upload">Run a batch</button>
+  <button type="button" class="tab" data-screen="chaos">Chaos</button>
 </nav>
 
 <main class="wrap" id="app">
@@ -207,6 +208,47 @@
       </p>
     </div>
     <ul class="reasons" id="reasons"></ul>
+  </section>
+</template>
+
+<template id="chaos-template">
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Break it on purpose</h2>
+      <p class="sub">
+        Name a corruption this system was never built for. It is injected into the bank
+        statement, and the batch is reconciled twice — clean and corrupted — against the
+        same answer key.
+      </p>
+      <p class="sub batch-note">
+        <strong>A graceful failure is the pass condition.</strong> Coverage collapsing
+        while precision holds is the system working: it routed what it did not understand
+        to a human instead of guessing. Coverage holding while precision collapses is the
+        only outcome that matters, because that is money posted against the wrong invoice
+        with no warning.
+      </p>
+    </div>
+
+    <div class="chaos-input">
+      <input id="chaos-text" type="text"
+             placeholder="e.g. a bank that reports dates a day early"
+             aria-label="Describe a corruption">
+      <button type="button" class="primary" id="chaos-run">Inject it</button>
+    </div>
+    <div class="chips" id="chaos-chips"></div>
+    <p class="hint" id="chaos-hint">
+      Typed in plain English. A deterministic keyword mapping is tried first and answers
+      almost everything; the model is consulted only when it finds nothing. The result says
+      which one answered.
+    </p>
+
+    <div class="job" id="job" hidden>
+      <div class="job-step" id="job-step">—</div>
+      <div class="job-bar"><div class="job-fill" id="job-fill"></div></div>
+      <div class="job-note" id="job-note"></div>
+    </div>
+
+    <div id="chaos-result" hidden></div>
   </section>
 </template>
 
