@@ -1,6 +1,8 @@
 """Spike: is batching exceptions into one LLM call safe?
 
-Batching takes a 25,000-row run from 175 minutes to under 10. But mis-ordering is a
+Batching takes a 25,000-row run from 175 minutes to under 10 -- an arithmetic bound that
+assumed the rate ceiling was saturated. Measured later at 27.2 rpm with a pool of 8, the
+real figure is ~11 minutes; see notes/decisions.md. But mis-ordering is a
 *silent correctness bug in a financial control* -- a reason attached to the wrong
 exception is worse than no reason, because it looks right.
 

@@ -239,6 +239,19 @@ Batching takes a 25,000-row run from 175 minutes to under 10. It was measured ra
 assumed, because a reason attached to the wrong exception is worse than no reason -- it
 looks right.
 
+> **SUPERSEDED, 23 Aug 2026.** The "under 10 minutes" figure assumed the 36 rpm ceiling was
+> saturated. The handler was sequential and achieved 5.3 rpm, which is **101 minutes**, not
+> nine. With bounded concurrency (pool of 8) it achieves a *measured* 27.2 rpm, which is
+> **~11 minutes** for the volume this spike assumed.
+>
+> The volume itself then fell. After the resolver fix, LLM-bound exceptions on `data/train`
+> drop from 1,198 to 459 -- a 25,000-row run needs roughly 116 calls rather than 303, which
+> is **under 5 minutes** if the new operating point survives the seal.
+>
+> The batching decision is unchanged and is now heavily over-provisioned rather than tight.
+> The figures to quote are 27.2 rpm measured and ~11 minutes; the earlier 8.7 was an
+> arithmetic upper bound presented as a result.
+
 ### Structural integrity: perfect at both sizes
 
 | | calls | items sent -> returned | all ids present | order stable | p50 | p95 | tokens/item |

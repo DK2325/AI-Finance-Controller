@@ -252,6 +252,15 @@ false                  4
 precision       99.5025%   95% Wilson CI [99.02%, 99.99%]
 ```
 
+**Why Wilson and not the normal approximation.** The normal interval is
+`p +/- 1.96 * sqrt(p(1-p)/n)`, which is symmetric about `p`. At `p` near 1 that is wrong in
+two ways at once: the upper bound runs **past 100%** -- here it gives 99.9888%, and with one
+fewer error it would exceed 1.0 outright, which is not a probability -- and the symmetry
+understates how far the true rate could be *below* the estimate, which is the direction that
+matters in a financial control. Wilson is derived by inverting the score test rather than
+assuming normality, so it stays inside [0, 1] and skews toward the centre, giving a lower
+bound that is honest about a small number of events near the boundary.
+
 **The floor sits inside the interval.** The estimate cannot distinguish 99.5% from 99.0%,
 so "holding the floor" is a statement about a point estimate, not about the true rate. Four
 decimal places on a quantity measured by four events is a precision claim the sample does
