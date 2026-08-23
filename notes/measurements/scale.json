@@ -1,0 +1,51 @@
+{
+  "machine": {
+    "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26200-SP0"
+  },
+  "batch": "data/scale",
+  "model_version": "v1-206ee339bd85",
+  "threshold": 0.9564,
+  "settlements": 24750,
+  "bank_rows": 22860,
+  "candidates": 94555,
+  "blocking": {
+    "per_pass": {
+      "counterparty": 9646,
+      "exact_amount": 56361,
+      "rate_amount": 88291,
+      "utr": 12927
+    },
+    "unique_candidates": 94555,
+    "n_settlements": 24750,
+    "n_bank": 22860,
+    "pairs_per_settlement": 3.82
+  },
+  "seconds": {
+    "load": 9.972,
+    "blocking": 28.116,
+    "features": 90.323,
+    "score_resolve": 106.404,
+    "total": 234.815
+  },
+  "peak_mb": {
+    "load": 59.3,
+    "blocking": 108.6,
+    "features": 179.4,
+    "score_resolve": 238.3
+  },
+  "settlements_per_second": 105.4,
+  "matched": 15071,
+  "exceptions": 9679,
+  "by_reason": {
+    "AMBIGUOUS_CANDIDATES": 253,
+    "BELOW_THRESHOLD": 3094,
+    "INVOICE_ALREADY_CLAIMED": 1166,
+    "NO_CANDIDATE": 1250,
+    "NO_INVOICE_LINK": 3916
+  },
+  "deterministic_share": 0.6542,
+  "llm_bound": 3347,
+  "llm_calls_at_batch_20": 168
+}
