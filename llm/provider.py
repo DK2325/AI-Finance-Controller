@@ -326,10 +326,41 @@ class MockProvider:
         if name in ("reason", "reason_text", "explanation", "summary"):
             return f"Mock explanation for {item.get('id', 'item')}."
 
+        if name == "lines":
+            return _mock_journal_lines(item)
+
         if schema.get("type") == "object":
             return self._object(schema, item, root)
 
         return _default_for(schema, root)
+
+
+def _mock_journal_lines(item: dict) -> list[dict]:
+    """The one place the mock is not schema-driven, and the reason it cannot be.
+
+    A JSON Schema can express "at least two lines" and "an integer at least zero". It
+    cannot express "the debits equal the credits" -- that invariant lives in a Pydantic
+    validator, and no amount of walking the schema will produce a value that satisfies it.
+    So a balanced entry is constructed here from the row's own amounts.
+
+    Kept deliberately narrow: two lines, real figures, and everything else about the
+    response still built by walking the schema. Widening this is how a mock stops
+    resembling the thing it stands in for.
+    """
+    amount = 0
+    for key in ("bank_credit", "net_amount", "gross_amount", "invoice_amount"):
+        try:
+            amount = int(item.get(key) or 0)
+        except (TypeError, ValueError):
+            amount = 0
+        if amount:
+            break
+    amount = amount or 100000
+
+    return [
+        {"account_code": "1100", "debit": amount, "credit": 0, "narrative": "Bank receipt."},
+        {"account_code": "1200", "debit": 0, "credit": amount, "narrative": "Clear receivable."},
+    ]
 
 
 def _looks_like_instructions(text: str) -> bool:
