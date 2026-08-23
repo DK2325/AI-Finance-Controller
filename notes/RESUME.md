@@ -1,6 +1,6 @@
 # Resume here
 
-Last updated 23 Aug 2026, end of Phase 5. Read this first when picking the build back up.
+Last updated at the close of Phase 7. Read this first when picking the build back up.
 
 ---
 
@@ -21,7 +21,10 @@ The two that catch people immediately:
 
 ## Where the build is
 
-**Phases 0–6 complete.** Phase 7 is next: scale, the sealed test set, failure analysis.
+**Phases 0–7 complete.** Phase 8 is next: README polish, video, rehearsal, cleanup.
+
+**Phase 7 is closed.** The seal is broken, scored, and reported; do not re-score
+`data/test`.
 
 | phase | state |
 |---|---|
@@ -32,12 +35,34 @@ The two that catch people immediately:
 | 4 classifier, calibration, operating point | ✅ tagged `v1-working` |
 | 5 LLM exception layer + audit trail | ✅ see notes/phase-5-report.md |
 | 6 API, frontend, chaos mode | ✅ see notes/phase-6-report.md |
-| **7 scale, sealed test set, failure analysis** | **← in progress; scale done, seal BROKEN and scored** |
-| 8 README, video, rehearsal | — |
+| 7 scale, sealed test set, failure analysis | ✅ see notes/phase-7-report.md |
+| **8 README, video, rehearsal** | **← next** |
 
-## Carried into Phase 6 and 7 — read notes/phase-5-report.md
+## Carried into Phase 8 — the short version
 
-Three things that must not be re-derived or accidentally assumed:
+**All three risks carried out of Phase 5 are now closed.** The operating point is confirmed
+against held-out data, the decoder stall is measured and closed, and the LLM-bound volume
+is measured rather than estimated. The list below is kept because a reader tracing how the
+numbers moved needs it; nothing in it is still open.
+
+| carried risk | outcome |
+|---|---|
+| operating point unconfirmed (0.9989 vs 0.9564) | **closed** — 0.9564 pre-committed, sealed set gives 62.91% at 99.9037% |
+| decoder stall open, cause unknown | **closed** — 2.38% over 168 calls, 0 surviving both attempts |
+| LLM-bound volume uncertain | **closed** — measured at three deterministic shares, 51.06% / 65.42% / 69.77% |
+
+### What Phase 8 must not undo
+
+1. **Do not re-score `data/test` and do not retune against it.** It was read once. A second
+   scored run is not out of sample, whatever it says.
+2. **Do not fix the abstention defect or build the `refund_netted` subset-sum pass.** Both
+   are diagnosed in `notes/failure-modes.md` and deliberately left. A fix validated against
+   the batch that exposed it is tuned to that batch; they belong against a fresh batch,
+   after submission.
+3. **Do not quote 99.9037% without 99.2369% beside it.** The two batches disagree and the
+   larger one is below the floor. Every document that carries one carries both.
+
+### The original Phase 5 note, for provenance
 
 1. **The operating point has moved and is NOT confirmed.** Documented 0.9989 / 51.31%;
    measured after a resolver fix, 0.9564 / 68.16%. **Phase 6 must not build a UI against
@@ -121,12 +146,18 @@ is 65.42% rather than 51.06%.
 - Reliability on test beside train; prior shift located by measurement ✅
 - Per-case-type confusion matrix, held-out called out ✅
 
-### Still to do
+### All Phase 7 exit criteria met
 
-- Unit economics data (the written interpretation is the human's own work)
-- `notes/failure-modes.md` completion
-- README rewrite: it still quotes 51.31% / 68.16%, both superseded by 62.91% at 99.9037%
-- **Cut** the Settlement Q&A layer — agreed, BUILD.md ranks it last
+| criterion | how |
+|---|---|
+| test-set metrics reported, unretuned | 62.91% at 99.9037%, scored once at 0.9564 |
+| held-out types separately and honestly | 68.00% [61.98%, 73.47%] and 0.00% [0.00%, 1.88%], never averaged |
+| 25,000-row run, throughput and ₹ cost | 105 settlements/s named machine, ₹22.15 – ₹36.76 |
+| per-case-type confusion matrix | README table, report §5 with intervals, `sealed_test.json` |
+| unit economics paragraph | **data produced, paragraph deliberately not written** — BUILD.md's Phase 7 note says the written interpretation is the human's own work. Measured half is in the README; `N` and `X` named as inputs |
+| `notes/failure-modes.md` written and honest | nine measured entries plus three general findings |
+
+**Cut as planned:** the Settlement Q&A layer. BUILD.md ranked it last.
 
 ### Why the scale run happened first
 
@@ -186,15 +217,23 @@ SUPERSEDED
   coverage 51.31% at precision 99.5050%   documented before the resolver fix
   coverage 68.16% at precision 99.5031%   eval split after it
 
-on data/train, at the documented point
-  matched + exceptions == 4,945 settlements, exactly once each
-  precision            99.96%  (95% CI 99.77%-99.99%, 1 false in 2,497)
-  Rs incorrectly matched  27,372.50 of 395,349,148.43 at stake
-  deterministic share  51.06% of exceptions never reach a model
-  reason-code actionability 97.92%
-  cost per 1,000 settlements  Rs 1.83 - Rs 3.03
-  throughput           27.2 rpm measured, pool of 8; matcher 25,000 rows in 6.4s
-tests                  489 passing, ruff clean
+on the sealed set, at the pre-committed point
+  matched + exceptions == 4,950 settlements, exactly once each
+  deterministic share  69.77% of exceptions never reach a model
+  reason-code actionability 97.55%  (95% CI 96.74%-98.16%, 1,791 of 1,836)
+    weakest code       AMBIGUOUS_CANDIDATES 26.7% -- blocking recall, not a labelling bug
+  cost per 1,000 settlements  Rs 0.68 - Rs 1.14   (measured, whole population)
+  review load per 1,000        370.9 reviewed, 629.1 removed
+
+on data/train, for comparison
+  precision            99.96%  (95% CI 99.77%-99.99%, 1 false in 2,497) at 0.9989
+  deterministic share  51.06%   cost Rs 1.83 - Rs 3.03 per 1,000
+
+throughput             105 settlements/s at 24,750 rows, AMD Ryzen 5 5600H, six cores
+                       reason job 10.1 rpm; parse 27.2 rpm -- quote the job, not "the" rate
+tests                  521 passing, ruff clean
+                       (was reported as 507; the count was partly luck, see
+                        failure-modes.md "Two guards that passed for the wrong reason")
 ```
 
 ## Environment: nothing to set up
@@ -213,10 +252,31 @@ tests                  489 passing, ruff clean
 
 Activate the venv and say:
 
-> **"Read notes/phase-7-report.md and notes/RESUME.md, then pick up the remaining
-> Phase 7 items."**
+> **"Read notes/conventions.md and notes/RESUME.md, then start Phase 8."**
 
 That is enough. Everything decided is written down in `notes/`.
+
+### Phase 8, in the order it should be done
+
+1. **The cleanup list below.** Deleting files changes what a reviewer sees, so it happens
+   before anything is rehearsed against.
+2. **Decide the `difficulty` flag: wire it or drop it.** It is still a no-op that claims to
+   do something, which is the one defect in this repo that is a lie rather than a limit.
+   Dropping it is the cheap answer and BUILD.md does not require it.
+3. **README polish.** The numbers are correct and current as of the close of Phase 7; what
+   remains is reading it end to end as a stranger would, not re-deriving figures.
+4. **Video and rehearsal.**
+5. **Flip the repo public.** It is private; a panel cannot see a private repo.
+
+### Phase 8 must not
+
+- **Re-score `data/test`.** Read once, reported once.
+- **Fix the abstention defect or add the `refund_netted` subset-sum pass.** Diagnosed and
+  deliberately left; they belong against a fresh batch after submission.
+- **Quote 99.9037% alone.** 99.2369% at 24,750 settlements goes with it, every time.
+- **Re-seed the deployment away from `v1-test`.** The live URL now shows the same numbers
+  the README reports, verified against a real image build. `tests/test_deployment.py`
+  enforces it.
 
 ---
 

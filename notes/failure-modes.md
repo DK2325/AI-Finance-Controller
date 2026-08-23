@@ -384,45 +384,6 @@ whose invoice was taken on the way to the decline, and nothing in the risk-cover
 accounts for that cost. All three sit at an identical calibrated probability, which is the
 isotonic step function's coarseness surfacing in a third place.
 
-### The evidence was on the page, and the question decided what could be seen
-
-**This is the most general version of the pattern this document is about, and it is worth
-stating separately because nothing was hidden, nothing was miscounted, and nobody was
-careless.**
-
-`notes/threshold.md` contains this table, written during operating-point selection:
-
-```
-value      on step   cum n   coverage   precision   false
-0.992754      196     803     67.99%    99.5019%       4   <- THE STEP
-0.956431        1     804     68.08%    99.5025%       4   <- selected
-0.945205       98     903     76.46%    99.3355%       6   <- breaches the floor
-```
-
-The `0.945205` row is annotated *"breaches the floor"*. It is the same step that, on the
-sealed set, consumes invoices below the operating point and denies them to the settlements
-that own them. The defect was sitting in a table that was studied closely, annotated by
-hand, and reasoned about at length — and it was invisible, because **the question being
-asked of that table was only ever "what does coverage do here?"**
-
-Under that question, `0.945205` is a row you decline to cross. Under the question "what
-happens to the candidates on this step when we decline to cross it?", it is a defect. The
-data supported both readings the whole time. Only one was asked.
-
-**Why this is worse than the four error messages above, and more useful.** Those were
-instruments that *described themselves inaccurately*; the fix each time was to classify
-rather than generalise, and a reader who checks the instrument finds the error. Here the
-instrument was correct, the number was correct, the annotation was correct, and the
-analysis was still incomplete — because completeness is relative to a question, and the
-question is the one thing a table cannot record.
-
-There is no mechanism that fixes this, which is why it is written down rather than
-converted into a test. The nearest thing to a remedy is a habit: **when a row is excluded
-from an analysis, ask what happens to the things it contains, not only to the metric it
-would have moved.** An abstention has a denominator too.
-
----
-
 **Not fixed, and the reason is not an oversight.** Two things make fixing it here the wrong
 move, and both are worth stating so that "not fixed" does not read as "not noticed":
 
@@ -929,6 +890,139 @@ they were built to be capable of failing:
 *   **this one**, which needed tied inputs, because ties are the path being tested.
 
 > **A test that cannot fail is documentation with a green tick.**
+
+---
+
+## Two guards that passed for the wrong reason
+
+**A distinct category from the error messages above, and a worse one.** Those instruments
+*reported* wrongly, so anyone who read the output had a chance to notice. These behaved
+exactly as intended while being broken, and produced the correct outcome for five phases
+by coincidence. **A guard that passes for the wrong reason is invisible until the reason
+changes**, and the reason is usually something nobody is watching.
+
+Both surfaced at Phase 7, neither by being looked for. A third defect of a different kind
+is recorded with them, because it was found in the same pass and makes the same point about
+small discrepancies being expensive out of proportion to their size.
+
+### `.gitignore`: every exception was inert
+
+```
+/runs/                 <- excludes the DIRECTORY
+!/runs/v1-train/       <- inert; git does not descend into an excluded directory
+!/runs/v1-train/**     <- inert
+```
+
+`runs/v1-train/` and `runs/_models/` are in the repository, the deployed image seeds from
+them, and the arrangement worked. It worked because those files had been added to the index
+*before* the ignore rule existed, and a tracked file is not affected by `.gitignore`. The
+exception never did anything. The comment beside it explained a mechanism that was not
+operating.
+
+It surfaced only when a *new* directory needed the same treatment: `runs/v1-test/` was
+refused by `git add`, and the pattern that had "worked" three times failed the first time
+it was actually asked to work. `/runs/*` excludes the contents rather than the directory,
+which git can re-include from, and all three exceptions now work for the reason the comment
+gives.
+
+**The tell, in hindsight:** the rule had never been exercised. Every path it supposedly
+protected predated it. The same shape as the deployment findings in
+`notes/phase-6-report.md` — a path that stopped being exercised is a path that has stopped
+being checked, whether or not anything about it changed.
+
+### A reproducibility test that was partly asserting on the clock
+
+`test_two_concurrent_runs_report_identically` runs the same job twice and compares the
+reports. It strips `wall_seconds` and `achieved_rpm` before comparing, because those
+obviously differ. It did not strip `usage.seconds`, which is accumulated wall-clock time
+rounded to two decimals — so a scheduling difference of five milliseconds failed the test.
+
+It failed intermittently, on a machine doing other work, in a suite otherwise green. **The
+figure reported at the end of several phases — "507 passing" — was therefore partly luck**,
+and reporting it as a clean result was reporting an outcome without knowing why it was
+clean.
+
+The fix strips timing fields at every depth. The important half is the second test added
+beside it: **a strip that removes every differing field passes unconditionally**, which is
+the failure mode of the fix itself, so there is now a test asserting the comparison still
+notices a real difference. That guard immediately earned itself — it caught a wrong
+assumption in the fix, that `call_log` was in the compared payload when it is not.
+
+### A third, smaller, and worth recording for the size of the gap rather than its cause
+
+`api/service.dashboard` chose which operating point the screen opens on by taking the curve
+point whose threshold was numerically *nearest* the one the run was scored at. On the
+held-out run the stored threshold `0.9564` sits 0.000268 below a point at `0.956132` and
+0.009323 below the point at `0.965723`. Nearest picks the first — which admits one candidate
+the operating point excludes.
+
+The screen would have shown **62.93% and 3,115 matched**, against a README saying **62.91%
+and 3,114**.
+
+**One row, in the last digit, and it mattered more than its size suggests.** A reader who
+sees 62.93% on a live page and 62.91% in a document does not conclude they are two
+measurements of different things. They conclude somebody was careless, and then they have
+no way to tell which of the other numbers to trust — every figure in the submission
+inherits the doubt raised by the cheapest-looking one. A large discrepancy invites the
+question *"what is different about these two?"* and gets an answer. A last-digit
+discrepancy invites the question *"is any of this checked?"* and does not.
+
+That is why this was worth fixing properly rather than rounding away: the correct point is
+the lowest threshold at or above the operating point, which by construction selects the
+identical set, and there is now a test asserting the screen and the run agree on the count.
+
+---
+
+### What the pair has in common
+
+Neither was found by inspection, and neither could have been. A guard that is passing looks
+identical to a guard that is working, and nothing distinguishes them until something asks
+the guard to do its job. Both were exposed by *change* — a new directory, a busier machine.
+
+The practical form: **when a check has never failed, ask what would make it fail, and
+whether that has ever happened.** A green result from a check that has never been exercised
+is not evidence, and the count of passing tests is not either.
+
+---
+
+## The evidence was on the page, and the question decided what could be seen
+
+**This is the most general finding in the project, and the only one with nothing to
+blame.** Every other entry in this document has a culprit: an instrument that described
+itself inaccurately, a metric that measured the wrong axis, a guard that was not
+guarding. Here the instrument was correct, the number was correct, the annotation was
+correct, the analysis was careful — and it was still incomplete.
+
+`notes/threshold.md` contains this table, written during operating-point selection:
+
+```
+value      on step   cum n   coverage   precision   false
+0.992754      196     803     67.99%    99.5019%       4   <- THE STEP
+0.956431        1     804     68.08%    99.5025%       4   <- selected
+0.945205       98     903     76.46%    99.3355%       6   <- breaches the floor
+```
+
+The `0.945205` row is annotated *"breaches the floor"*. It is the same step that, on the
+sealed set, consumes invoices below the operating point and denies them to the settlements
+that own them. The defect was sitting in a table that was studied closely, annotated by
+hand, and reasoned about at length — and it was invisible, because **the question being
+asked of that table was only ever "what does coverage do here?"**
+
+Under that question, `0.945205` is a row you decline to cross. Under the question "what
+happens to the candidates on this step when we decline to cross it?", it is a defect. The
+data supported both readings the whole time. Only one was asked.
+
+**Why this is worse than the four error messages above, and more useful.** Those were
+instruments that *described themselves inaccurately*; the fix each time was to classify
+rather than generalise, and a reader who checks the instrument finds the error. Here the
+instrument was correct, the number was correct, the annotation was correct, and the
+analysis was still incomplete — because completeness is relative to a question, and the
+question is the one thing a table cannot record.
+
+There is no mechanism that fixes this, which is why it is written down rather than
+converted into a test. The nearest thing to a remedy is a habit: **when a row is excluded
+from an analysis, ask what happens to the things it contains, not only to the metric it
+would have moved.** An abstention has a denominator too.
 
 ---
 
