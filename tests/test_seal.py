@@ -15,9 +15,19 @@ Two things are enforced:
     based, so a comment mentioning it is fine but a path that code could actually open
     is not.
 
-Phase 7 breaks the seal deliberately, once, by deleting the marker in the same commit
+Phase 7 broke the seal deliberately, once, by deleting the marker in the same commit
 that reports the test-set numbers. That makes unsealing an explicit, reviewable event in
 the history rather than something that quietly happened.
+
+**The seal is now broken, and this file still enforces integrity.** `.sealed` was
+replaced by `.unsealed`, which carries the same sha256 map. That matters more after the
+unsealing than before it: the whole value of the reported numbers rests on the claim that
+the scored files are the files that were sealed, and once the marker is gone there is
+nothing but this check standing between that claim and a quiet regeneration. So the
+integrity test did not go away with the seal -- it changed which marker it reads.
+
+The access lint is unconditional and unchanged: evals/ may read the test set, nothing else
+may name it.
 """
 
 from __future__ import annotations
@@ -33,7 +43,8 @@ from astutil import code_strings
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TEST_DIR = REPO_ROOT / "data" / "test"
-MARKER = TEST_DIR / ".sealed"
+SEALED_MARKER = TEST_DIR / ".sealed"
+UNSEALED_MARKER = TEST_DIR / ".unsealed"
 
 # evals/ may read both sides. Everything else may not touch the held-out set.
 PERMITTED_PACKAGE = "evals"
@@ -42,23 +53,49 @@ GUARDED_PACKAGES = ("core", "model", "llm", "api", "datagen", "ledgerloop")
 SEALED_PATH_TOKENS = ("data/test", "data\\test", "data/test/")
 
 
-def test_the_seal_marker_exists() -> None:
-    assert MARKER.is_file(), (
-        "data/test/.sealed is missing. Either the test set was never generated, or the "
-        "seal was removed outside Phase 7."
+def _marker() -> dict:
+    """The integrity record, whichever side of the unsealing we are on.
+
+    Exactly one of the two must exist. Both present would mean the unsealing was recorded
+    without being carried out; neither means the record was deleted rather than
+    superseded, and the out-of-sample claim then rests on nothing checkable.
+    """
+    present = [m for m in (SEALED_MARKER, UNSEALED_MARKER) if m.is_file()]
+    assert len(present) == 1, (
+        "expected exactly one of data/test/.sealed or data/test/.unsealed, found "
+        f"{[m.name for m in present]}. The unsealing replaces one with the other in a "
+        "single commit; any other state is a mistake, not a phase."
     )
+    return json.loads(present[0].read_text(encoding="utf-8"))
 
 
-def test_the_marker_says_it_is_still_sealed() -> None:
-    marker = json.loads(MARKER.read_text(encoding="utf-8"))
-    assert marker["sealed"] is True
-    assert marker["unseal_at_phase"] == 7
+def test_an_integrity_marker_exists() -> None:
+    """Sealed or not, the test set must carry a record of what it is supposed to be."""
+    _marker()
+
+
+def test_the_marker_agrees_with_itself_about_the_seal() -> None:
+    marker = _marker()
+    if SEALED_MARKER.is_file():
+        assert marker["sealed"] is True
+        assert marker["unseal_at_phase"] == 7
+    else:
+        # Post-unsealing. The record must say so, must say it was verified at the moment
+        # the seal broke, and must still name the threshold it was scored at -- a number
+        # chosen before this file existed.
+        assert marker["sealed"] is False
+        assert marker["unsealed_at_phase"] == 7
+        assert marker["integrity_verified_at_unsealing"] is True
+        assert marker["scored_at_threshold"] == 0.9564
 
 
 def test_no_file_in_the_test_set_has_changed() -> None:
-    """A regenerated test set is a different test set. Fail loudly if it moved."""
-    marker = json.loads(MARKER.read_text(encoding="utf-8"))
-    recorded = marker["sha256"]
+    """A regenerated test set is a different test set. Fail loudly if it moved.
+
+    This outlives the seal on purpose. After unsealing it is the only thing that still
+    connects the reported numbers to the bytes they were computed from.
+    """
+    recorded = _marker()["sha256"]
 
     on_disk = {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()

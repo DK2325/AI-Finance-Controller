@@ -1,0 +1,343 @@
+{
+  "batch": "data/scale",
+  "model_version": "v1-206ee339bd85",
+  "threshold": 0.9564,
+  "threshold_source": "notes/phase-7-precommitment.md, committed at a733ad4",
+  "machine": {
+    "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26200-SP0"
+  },
+  "seconds": 37.505,
+  "score": {
+    "threshold": 0.9564,
+    "n_decidable": 24750,
+    "n_predicted": 15071,
+    "n_true_positives": 14956,
+    "n_false_positives": 115,
+    "coverage": 0.6089292929292929,
+    "precision": 0.992369451264017,
+    "recall": 0.6042828282828283,
+    "total_money": 202182500026,
+    "matched_money": 122406885407,
+    "wrong_money": 1333059799,
+    "money_weighted_precision": 0.9891096011914068,
+    "money_error_ratio": 0.0065933490723904045,
+    "n_orphans": 250,
+    "n_orphans_refused": 250,
+    "orphan_refusal_rate": 1.0,
+    "precision_ci_low": 0.990849,
+    "precision_ci_high": 0.993639
+  },
+  "coverage_definitions": {
+    "predictions_over_decidable": 0.608929,
+    "matched_over_settlements": 0.608929,
+    "note": "notes/metrics.md defines coverage as |P(t)|/|D| over non-orphan truth triples. notes/measurements/scale.py reported matched/settlements. Both are given so the pre-committed prediction is judged like for like."
+  },
+  "settlements": 24750,
+  "matched_settlements": 15071,
+  "truth_rows_by_case_type": {
+    "batched_settlement": 3000,
+    "clean": 13750,
+    "date_skew": 750,
+    "duplicate_utr": 500,
+    "fee_deducted": 2500,
+    "orphan": 250,
+    "partial_payment": 1500,
+    "refund_netted": 1000,
+    "rounding_drift": 500,
+    "tds_deducted": 1250
+  },
+  "confusion_by_case_type": {
+    "seen": {
+      "batched_settlement": {
+        "total": 3000,
+        "matched": 968,
+        "missed": 2032,
+        "refused": 0,
+        "false_matches_attributed": 2,
+        "rate": 0.322667,
+        "rate_is": "matched",
+        "ci_low": 0.306174,
+        "ci_high": 0.339613,
+        "ci_width": 0.033439,
+        "held_out": false
+      },
+      "clean": {
+        "total": 13750,
+        "matched": 9516,
+        "missed": 4234,
+        "refused": 0,
+        "false_matches_attributed": 74,
+        "rate": 0.692073,
+        "rate_is": "matched",
+        "ci_low": 0.684304,
+        "ci_high": 0.699734,
+        "ci_width": 0.01543,
+        "held_out": false
+      },
+      "date_skew": {
+        "total": 750,
+        "matched": 349,
+        "missed": 401,
+        "refused": 0,
+        "false_matches_attributed": 2,
+        "rate": 0.465333,
+        "rate_is": "matched",
+        "ci_low": 0.429903,
+        "ci_high": 0.501117,
+        "ci_width": 0.071214,
+        "held_out": false
+      },
+      "duplicate_utr": {
+        "total": 500,
+        "matched": 364,
+        "missed": 136,
+        "refused": 0,
+        "false_matches_attributed": 2,
+        "rate": 0.728,
+        "rate_is": "matched",
+        "ci_low": 0.687367,
+        "ci_high": 0.765156,
+        "ci_width": 0.077789,
+        "held_out": false
+      },
+      "fee_deducted": {
+        "total": 2500,
+        "matched": 1842,
+        "missed": 658,
+        "refused": 0,
+        "false_matches_attributed": 27,
+        "rate": 0.7368,
+        "rate_is": "matched",
+        "ci_low": 0.719184,
+        "ci_high": 0.753689,
+        "ci_width": 0.034506,
+        "held_out": false
+      },
+      "orphan": {
+        "total": 250,
+        "matched": 0,
+        "missed": 0,
+        "refused": 250,
+        "false_matches_attributed": 0,
+        "rate": 1.0,
+        "rate_is": "refusal",
+        "ci_low": 0.984867,
+        "ci_high": 1.0,
+        "ci_width": 0.015133,
+        "held_out": false
+      },
+      "partial_payment": {
+        "total": 1500,
+        "matched": 776,
+        "missed": 724,
+        "refused": 0,
+        "false_matches_attributed": 4,
+        "rate": 0.517333,
+        "rate_is": "matched",
+        "ci_low": 0.492034,
+        "ci_high": 0.542545,
+        "ci_width": 0.050511,
+        "held_out": false
+      },
+      "rounding_drift": {
+        "total": 500,
+        "matched": 257,
+        "missed": 243,
+        "refused": 0,
+        "false_matches_attributed": 2,
+        "rate": 0.514,
+        "rate_is": "matched",
+        "ci_low": 0.470252,
+        "ci_high": 0.557535,
+        "ci_width": 0.087283,
+        "held_out": false
+      }
+    },
+    "held_out": {
+      "refund_netted": {
+        "total": 1000,
+        "matched": 0,
+        "missed": 1000,
+        "refused": 0,
+        "false_matches_attributed": 2,
+        "rate": 0.0,
+        "rate_is": "matched",
+        "ci_low": 0.0,
+        "ci_high": 0.003827,
+        "ci_width": 0.003827,
+        "held_out": true
+      },
+      "tds_deducted": {
+        "total": 1250,
+        "matched": 884,
+        "missed": 366,
+        "refused": 0,
+        "false_matches_attributed": 0,
+        "rate": 0.7072,
+        "rate_is": "matched",
+        "ci_low": 0.68137,
+        "ci_high": 0.731761,
+        "ci_width": 0.050391,
+        "held_out": true
+      }
+    }
+  },
+  "calibration": {
+    "train_eval_split_recorded": {
+      "brier": 0.016449,
+      "ece": 0.010436,
+      "mce": 0.364118,
+      "n": 1958,
+      "note": "the honest number: neither model nor calibrator saw this split"
+    },
+    "this_batch_all": {
+      "n": 94555,
+      "ece": 0.019573,
+      "mce": 0.550405,
+      "brier": 0.022388,
+      "base_rate": 0.192301
+    },
+    "this_batch_seen_types": {
+      "n": 89887,
+      "ece": 0.0207,
+      "mce": 0.675169,
+      "brier": 0.02075,
+      "base_rate": 0.185266
+    },
+    "this_batch_held_out_types": {
+      "n": 4668,
+      "ece": 0.063174,
+      "mce": 0.662424,
+      "brier": 0.053921,
+      "base_rate": 0.327763
+    },
+    "bins": [
+      {
+        "lower": 0.0,
+        "upper": 0.1,
+        "n": 73478,
+        "mean_predicted": 2e-05,
+        "observed_rate": 0.00227,
+        "gap": 0.00225,
+        "n_held_out": 3250,
+        "held_out_share": 0.044231
+      },
+      {
+        "lower": 0.1,
+        "upper": 0.2,
+        "n": 19,
+        "mean_predicted": 0.15026,
+        "observed_rate": 0.0,
+        "gap": 0.15026,
+        "n_held_out": 1,
+        "held_out_share": 0.052632
+      },
+      {
+        "lower": 0.2,
+        "upper": 0.3,
+        "n": 1219,
+        "mean_predicted": 0.24967,
+        "observed_rate": 0.19114,
+        "gap": 0.05853,
+        "n_held_out": 159,
+        "held_out_share": 0.130435
+      },
+      {
+        "lower": 0.3,
+        "upper": 0.4,
+        "n": 6,
+        "mean_predicted": 0.35646,
+        "observed_rate": 0.5,
+        "gap": 0.14354,
+        "n_held_out": 2,
+        "held_out_share": 0.333333
+      },
+      {
+        "lower": 0.4,
+        "upper": 0.5,
+        "n": 2,
+        "mean_predicted": 0.44959,
+        "observed_rate": 1.0,
+        "gap": 0.55041,
+        "n_held_out": 1,
+        "held_out_share": 0.5
+      },
+      {
+        "lower": 0.5,
+        "upper": 0.6,
+        "n": 5,
+        "mean_predicted": 0.54569,
+        "observed_rate": 0.2,
+        "gap": 0.34569,
+        "n_held_out": 1,
+        "held_out_share": 0.2
+      },
+      {
+        "lower": 0.6,
+        "upper": 0.7,
+        "n": 598,
+        "mean_predicted": 0.66691,
+        "observed_rate": 0.39298,
+        "gap": 0.27393,
+        "n_held_out": 124,
+        "held_out_share": 0.207358
+      },
+      {
+        "lower": 0.7,
+        "upper": 0.8,
+        "n": 34,
+        "mean_predicted": 0.74609,
+        "observed_rate": 0.52941,
+        "gap": 0.21668,
+        "n_held_out": 7,
+        "held_out_share": 0.205882
+      },
+      {
+        "lower": 0.8,
+        "upper": 0.9,
+        "n": 44,
+        "mean_predicted": 0.8472,
+        "observed_rate": 0.34091,
+        "gap": 0.50629,
+        "n_held_out": 9,
+        "held_out_share": 0.204545
+      },
+      {
+        "lower": 0.9,
+        "upper": 1.0,
+        "n": 19150,
+        "mean_predicted": 0.98814,
+        "observed_rate": 0.91431,
+        "gap": 0.07384,
+        "n_held_out": 1114,
+        "held_out_share": 0.058172
+      }
+    ],
+    "held_out_position_in_score_distribution": {
+      "n_candidates": 4668,
+      "share_of_all_candidates": 0.049368,
+      "mean_probability": 0.264634,
+      "median_probability": 0.0,
+      "share_at_or_above_threshold": 0.190231,
+      "n_at_or_above_threshold": 888,
+      "positives_among_held_out": 1530
+    }
+  },
+  "accounting": {
+    "matched": 15071,
+    "exceptions": 9679,
+    "accounted_for": 24750,
+    "complete": true,
+    "by_reason": {
+      "AMBIGUOUS_CANDIDATES": 253,
+      "BELOW_THRESHOLD": 3094,
+      "INVOICE_ALREADY_CLAIMED": 1166,
+      "NO_CANDIDATE": 1250,
+      "NO_INVOICE_LINK": 3916
+    },
+    "deterministic_share": 0.6542,
+    "llm_bound": 3347
+  }
+}

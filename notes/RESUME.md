@@ -32,7 +32,7 @@ The two that catch people immediately:
 | 4 classifier, calibration, operating point | ✅ tagged `v1-working` |
 | 5 LLM exception layer + audit trail | ✅ see notes/phase-5-report.md |
 | 6 API, frontend, chaos mode | ✅ see notes/phase-6-report.md |
-| **7 scale, sealed test set, failure analysis** | **← in progress; scale done, seal intact** |
+| **7 scale, sealed test set, failure analysis** | **← in progress; scale done, seal BROKEN and scored** |
 | 8 README, video, rehearsal | — |
 
 ## Carried into Phase 6 and 7 — read notes/phase-5-report.md
@@ -48,20 +48,17 @@ Three things that must not be re-derived or accidentally assumed:
 3. **LLM-bound exceptions fell 1,198 -> 459** after the resolver fix. Batch 20 and a pool of
    8 are now over-provisioned rather than tight. Do not re-tune; do not re-derive.
 
-## Phase 7 — WHERE IT STANDS, and the one thing not yet done
+## Phase 7 — WHERE IT STANDS
 
-**The seal on `data/test` is INTACT and has NOT been read.** Breaking it is the next action
-and it is the only irreversible one in the project.
+**The seal on `data/test` is BROKEN. It was read once, scored once, and reported.** The
+irreversible action is done and cannot be repeated. `data/test/.sealed` was replaced by
+`data/test/.unsealed`, which carries the same sha256 map forward so integrity is still
+enforced by `tests/test_seal.py`.
 
-### Start here, in a fresh session
+**Results: `notes/phase-7-report.md`, raw output `notes/measurements/sealed_test.json`.**
 
-> **"Read notes/conventions.md and notes/phase-7-precommitment.md, then break the
-> seal."**
-
-Read the pre-commitment **from the repository**, not from anyone's memory of a
-conversation. It is committed at `a733ad4`, before the seal was touched, and
-`tests/test_seal.py` passes at that commit — so a new session can verify the threshold was
-fixed before `data/test` was read without trusting what anybody remembers.
+Do not re-score `data/test`. The first scored run is the reported run, and a second one
+would not be out of sample.
 
 ### Done, and committed
 
@@ -115,15 +112,20 @@ call and is latency-bound rather than rate-limited. Quote the job, not "the" rat
 settlements**, lower than the earlier ₹1.83 – ₹3.03 because this batch's deterministic share
 is 65.42% rather than 51.06%.
 
-### Still to do after the seal
+### Done in the unsealing commit
 
-- Break the seal: delete `data/test/.sealed` **in the same commit as the numbers**
-- Held-out case types (`tds_deducted`, `refund_netted`) reported **separately**, with
-  intervals — 450 truth rows across two types, so expect wide ones and report them as wide
-- Reliability diagram on test beside train; diagnose prior shift with evidence
-- Per-case-type confusion matrix
+- Seal broken: `.sealed` deleted, `.unsealed` written, numbers in the same commit ✅
+- Held-out types reported separately, with intervals ✅ — and the "expect wide intervals"
+  guidance held for `tds_deducted` (11.49 pts) but **not** for `refund_netted`, where 0 of
+  200 gives a *narrow* [0%, 1.88%] and settles the question decisively
+- Reliability on test beside train; prior shift located by measurement ✅
+- Per-case-type confusion matrix, held-out called out ✅
+
+### Still to do
+
 - Unit economics data (the written interpretation is the human's own work)
 - `notes/failure-modes.md` completion
+- README rewrite: it still quotes 51.31% / 68.16%, both superseded by 62.91% at 99.9037%
 - **Cut** the Settlement Q&A layer — agreed, BUILD.md ranks it last
 
 ### Why the scale run happened first
@@ -173,10 +175,16 @@ rather than an unqualified number that a reader will assume describes the live s
 ## Headline numbers as of now
 
 ```
-DOCUMENTED (out of sample, at the 99.5% floor)   see the caveat above
-  coverage 51.31% at precision 99.5050%
-MEASURED after the resolver fix, unconfirmed
-  coverage 68.16% at precision 99.5031%          seal decides
+SEALED TEST SET (data/test, 4,950 settlements, scored once at 0.9564)
+  coverage 62.91% at precision 99.9037%  (95% CI 99.7171%-99.9672%, 3 false in 3,114)
+  Rs incorrectly matched 671,820.00 of 416,605,821.54 at stake
+  held out  tds_deducted 68.00% [61.98%, 73.47%]   refund_netted 0.00% [0.00%, 1.88%]
+  ECE 0.012031 vs 0.010436 on train's eval split; 0.007497 excluding held-out types
+  CAVEAT: precision at 24,750 settlements (data/scale) is 99.2369% -- under the floor.
+          Quote the two together; see notes/phase-7-report.md section 2.
+SUPERSEDED
+  coverage 51.31% at precision 99.5050%   documented before the resolver fix
+  coverage 68.16% at precision 99.5031%   eval split after it
 
 on data/train, at the documented point
   matched + exceptions == 4,945 settlements, exactly once each
@@ -205,7 +213,8 @@ tests                  489 passing, ruff clean
 
 Activate the venv and say:
 
-> **"Read notes/phase-7-precommitment.md and notes/RESUME.md, then break the seal."**
+> **"Read notes/phase-7-report.md and notes/RESUME.md, then pick up the remaining
+> Phase 7 items."**
 
 That is enough. Everything decided is written down in `notes/`.
 
@@ -261,10 +270,10 @@ documentation. Commit messages describe the change and the reasoning.
 
 - **Flip the repo public before 5 Sept.** It is private now; the panel cannot see a
   private repo. Do it on the 4th, not the 5th.
-- **`data/test` is sealed and unread.** `tests/test_seal.py` enforces it. Phase 7 breaks
-  the seal by deleting the marker in the same commit that reports the test numbers, so
-  the unsealing is an auditable event.
-- **Do not retune against the test set** when the seal breaks. Report what it says.
+- **`data/test` has been read, once.** The seal is broken and `.unsealed` records it.
+  `tests/test_seal.py` still enforces the sha256 map, which is what keeps the reported
+  numbers tied to specific bytes now that the marker is gone.
+- **Do not re-score `data/test` and do not retune against it.** It has been reported.
 - **Never commit `.env`.** `tests/test_secrets.py` fails the build if it is tracked, or
   if any tracked file grows a credential-shaped string.
 - `difficulty` is still a no-op flag. Wire it in Phase 7 or drop it — do not ship

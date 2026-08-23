@@ -1,0 +1,22 @@
+{
+  "integrity_verified_at_unsealing": true,
+  "read_once": "Scored once, at one threshold, chosen before this file existed. No retuning, no re-generation, no selection among runs. Any future change to these files invalidates the out-of-sample claim, and the hashes below are what makes that checkable.",
+  "reseal_reason": "Regenerated on 23 Aug 2026 with the reworked generator. The original test set was drawn from a distribution the training set no longer shares, which would have made every Phase 7 number meaningless. Nothing had been read from this batch at the time, so no tuning could have been informed by it and the held-out result is still genuinely out-of-sample. This is the only permitted regeneration; the next time this marker changes must be its deletion in Phase 7.",
+  "resealed_at_phase": 3,
+  "results": "notes/measurements/sealed_test.json, notes/phase-7-report.md",
+  "scored_at_threshold": 0.9564,
+  "sealed": false,
+  "sealed_at_phase": 1,
+  "seed": 7,
+  "sha256": {
+    "bank_statement.csv": "efe83300af02c1b98c18d83419cc6a71639b29b198b17ac436a87df276360ba2",
+    "gateway_settlements.csv": "00727c7f58e52424f6d540bd4def752b1cbd559ba0f3eedc8a60078d271b5a55",
+    "invoice_ledger.csv": "1af7f38dcb68cc8db6c39f630468ef33869bc070d3bc6de736cec42226c7cbee",
+    "manifest.json": "1b662a6a08d123511330f83179d8cb273273d2df5b73308559cbf1b7d515633c",
+    "truth.csv": "421b7a4a0420c2cdeeaa74d27d82cf5c673efc0d2f38bb74afa8cb9284c194c2"
+  },
+  "threshold_precommitted_at": "a733ad4 (notes/phase-7-precommitment.md), seal intact at that commit",
+  "unsealed_at_phase": 7,
+  "what_this_is": "The successor to data/test/.sealed. The seal was broken deliberately, once, in the same commit that reports the numbers it produced. This file exists so that breaking the seal does not also discard the integrity record: the sha256 map below is carried over unchanged from .sealed, so the test set remains provably the one that was sealed rather than merely the one currently on disk.",
+  "why_it_was_sealed": "The held-out test set. Reading it before Phase 7 invalidates every number in the submission, because any tuning done with knowledge of it is no longer an honest out-of-sample result. tests/test_seal.py enforces this."
+}
