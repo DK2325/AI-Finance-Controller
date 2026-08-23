@@ -105,6 +105,10 @@ class Usage:
             "input_tokens": response.input_tokens,
             "output_tokens": response.output_tokens,
             "truncated": response.truncated,
+            # Recorded per call, not just per failure: a stall that a retry rescues leaves
+            # no exception behind, so without this the only trace of it is a token bill.
+            "stalled": response.stalled,
+            "raw_chars": response.raw_chars,
             "retry": retry,
         })
         self.retries += int(retry)

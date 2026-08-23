@@ -166,8 +166,94 @@ need.
 number: *is this reading physically possible?* Two experiments were spent because it was
 not, and nobody asked.
 
+### And the sixth: an instrument that was correct and measured a different axis
+
+Distinct from the `.strip()` entry above, and the distinction is the useful part.
+
+| | what went wrong |
+|---|---|
+| `.strip()` | the instrument was correct; **the evidence had been destroyed** before it reached the instrument |
+| this one | the instrument was correct; **it was measuring a different axis** from the one that moved |
+
+**What happened.** Removing an array field from the parse schema fixed a decoder stall.
+Every number improved: schema failure rate 0.0%, provenance 0 failures over 280 fields,
+wall time down 3x, tokens down 41%. It read as an unqualified win.
+
+Meanwhile UTR extraction had fallen from 63 of 71 to **48 of 71**. A third of the UTRs
+went missing and not one metric moved, because the provenance gate answers *"of the claims
+that were made, how many were true?"* — and a field that is never answered makes no claim.
+A miss is an `EMPTY` verdict, never `ABSENT`. The gate was working perfectly. It is simply
+not a coverage instrument and was never designed to be.
+
+> **Every quality metric needs a coverage metric beside it.** A rate computed over claims
+> made says nothing about the claims that were never attempted.
+
+**The fix, implemented rather than noted.** `ProvenanceStats` now reports `claim_rate` and
+`claim_rate_by_field` alongside the failure rate:
+`tests/test_provenance.py::test_a_field_that_stops_being_answered_moves_the_claim_rate`
+holds two runs with identical, perfect quality scores and different coverage, so the blind
+spot cannot come back silently.
+
+**It caught something on its first run.** A rule added to `parse.v3` — *"payment_method is
+`unknown` unless the narration indicates one; guessing is worse than declining"* — made the
+model decline 60 cases where the method is written literally in the narration.
+`payment_method` claim rate collapsed from 0.98 to **0.38**, with the failure rate still at
+0.0% throughout. Nothing else in the pipeline would have noticed. Corrected in `parse.v4`;
+claim rate back to 0.98, against a ground truth of 98 of 100 narrations naming a method.
+
+**The audit this prompts.** Every quality rate in the codebase, checked for a coverage
+counterpart:
+
+| rate | coverage beside it | |
+|---|---|---|
+| `Score.precision` | `Score.coverage` | ✅ already paired |
+| `RiskCoverageCurve` | coverage *is* the x-axis | ✅ by construction |
+| operating point precision | selected against coverage | ✅ |
+| `SubsetSumStats.cap_hit_rate` | reports buckets skipped | ✅ |
+| `JobResult.schema_failure_rate` | every row returns an outcome, asserted | ✅ |
+| `ProvenanceStats.field_failure_rate` | **had none** | ❌ → fixed |
+
+One gap, now closed.
+
 ---
 
 ## Known limitations of the system
 
 *Populated from Phase 3 onward as real failures are measured.*
+
+---
+
+## Where the regex-dominance finding does not hold
+
+`README.md` states a theorem: if the provenance gate's verification can be run in reverse
+to generate the value, the model was never needed for that field. On this data it holds
+completely — regex 71/71 against the model's 48/71 on UTR, and zero of 4,528 narrations in
+`data/train` carry a UTR needing more than a plain regex.
+
+**That last clause is the boundary, and it is a property of our generator.**
+
+Real bank narrations carry UTRs that a plain regex misses: digits split across a line
+wrap, grouped in fours, broken by an inserted space from a fixed-width export. A language
+model reads those correctly and a `\d{12}` does not.
+
+Our generator does not produce them, so the measurement above cannot see the case where
+the model would win.
+
+**And there is a second-order point that is more interesting than the first.** If such a
+narration arrived today, the model would extract the UTR correctly and **the provenance
+gate would reject it anyway** — because the gate requires a whole 12-digit run in the
+source text, and a UTR written `3000 0000 4412` is not one. The gate and the field would
+be working against each other: the model does the thing only it can do, and the check
+throws the answer away.
+
+So the honest statement of the finding is narrower than the headline:
+
+> On data where every identifier is regex-extractable, the model is strictly dominated on
+> identifier fields. On data where it is not, our gate would currently discard the model's
+> advantage, and the remedy would be to loosen how the identifier is *compared* —
+> normalising separators on both sides before matching — not to loosen whether a failure
+> blocks.
+
+That change is not made now, because there is nothing in this dataset to justify it and an
+unexercised code path is a liability. It is written down so the decision is visible rather
+than absent, and so a reviewer who raises it finds it already answered.

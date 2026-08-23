@@ -373,47 +373,102 @@ def reconcile_ids(sent: Iterable[str], returned: Iterable[str]) -> IdReconciliat
 
 @dataclass
 class ProvenanceStats:
-    """The measured failure rate, reported per run.
+    """The measured failure rate, reported *beside a coverage rate*, per field.
 
     'Fields checked' counts only fields that made a claim -- an EMPTY verdict is not a
     pass, it is an absence of anything to pass. Counting them would dilute the rate with
     nulls and make the gate look more effective than it is.
+
+    WHY THE CLAIM RATE IS HERE
+
+    That definition is correct and it has a blind spot, which cost a real regression.
+    Removing an array field from the parse schema fixed a decoder stall and every quality
+    number stayed perfect -- 0 failures over 280 fields -- while UTR extraction quietly
+    fell from 63 of 71 to 48 of 71. A missed field is EMPTY, never ABSENT, so a failure
+    rate computed over claims made is blind by construction to claims not made.
+
+    The general rule that follows:
+
+        **Every quality metric needs a coverage metric beside it.** A rate over claims
+        made says nothing about the claims that were never attempted.
+
+    So `claim_rate` is reported per field alongside the failure rate. A field that starts
+    coming back null will move it, where nothing else in this class would notice.
     """
 
     items: int = 0
     items_failed: int = 0
     fields_checked: int = 0
     fields_absent: int = 0
+    fields_empty: int = 0
     by_field: dict[str, int] | None = None
+    claims_by_field: dict[str, int] | None = None
+    offers_by_field: dict[str, int] | None = None
 
     def record(self, result: ProvenanceResult) -> None:
         if self.by_field is None:
-            self.by_field = {}
+            self.by_field, self.claims_by_field, self.offers_by_field = {}, {}, {}
         self.items += 1
         if not result.passed:
             self.items_failed += 1
+
         for check in result.checks:
-            if check.verdict in (Verdict.PRESENT, Verdict.ABSENT):
-                self.fields_checked += 1
+            if check.verdict is Verdict.UNCHECKED:
+                continue
+            # Every field the schema asked for is an offer, whether or not it was answered.
+            self.offers_by_field[check.field] = self.offers_by_field.get(check.field, 0) + 1
+
+            if check.verdict is Verdict.EMPTY:
+                self.fields_empty += 1
+                continue
+
+            self.fields_checked += 1
+            self.claims_by_field[check.field] = self.claims_by_field.get(check.field, 0) + 1
             if check.failed:
                 self.fields_absent += 1
                 self.by_field[check.field] = self.by_field.get(check.field, 0) + 1
 
     @property
     def field_failure_rate(self) -> float:
+        """Of the claims that were made, how many were untrue. Quality."""
         return self.fields_absent / self.fields_checked if self.fields_checked else 0.0
+
+    @property
+    def claim_rate(self) -> float:
+        """Of the fields that were asked for, how many were answered at all. Coverage.
+
+        Not a correctness measure and not meant to be one. It is the number that moves
+        when a model quietly stops answering, which no failure rate can see.
+        """
+        offered = self.fields_checked + self.fields_empty
+        return self.fields_checked / offered if offered else 0.0
 
     @property
     def item_failure_rate(self) -> float:
         return self.items_failed / self.items if self.items else 0.0
+
+    def claim_rate_by_field(self) -> dict[str, float]:
+        offers = self.offers_by_field or {}
+        claims = self.claims_by_field or {}
+        return {
+            name: round(claims.get(name, 0) / count, 4)
+            for name, count in sorted(offers.items())
+            if count
+        }
 
     def as_dict(self) -> dict:
         return {
             "items": self.items,
             "items_failed": self.items_failed,
             "item_failure_rate": round(self.item_failure_rate, 5),
+            # Quality: of what was claimed, how much was true.
             "fields_checked": self.fields_checked,
             "fields_absent": self.fields_absent,
             "field_failure_rate": round(self.field_failure_rate, 5),
-            "by_field": dict(sorted((self.by_field or {}).items())),
+            "failures_by_field": dict(sorted((self.by_field or {}).items())),
+            # Coverage: of what was asked for, how much was answered. Reported beside the
+            # quality numbers, never instead of them.
+            "fields_empty": self.fields_empty,
+            "claim_rate": round(self.claim_rate, 5),
+            "claim_rate_by_field": self.claim_rate_by_field(),
         }

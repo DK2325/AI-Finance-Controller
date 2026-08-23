@@ -304,6 +304,33 @@ def test_a_required_failure_outranks_an_advisory_one() -> None:
 # ------------------------------------------------------------------- reporting
 
 
+def test_a_field_that_stops_being_answered_moves_the_claim_rate() -> None:
+    """The general defence. A failure rate over claims made is blind to claims not made.
+
+    This is the shape of the regression that hid behind a perfect quality score: removing
+    an array field fixed a decoder stall, every provenance number stayed at zero failures,
+    and UTR extraction fell from 63 of 71 to 48 of 71. Nothing in a failure rate can see
+    that, because a missed field is EMPTY and never ABSENT.
+    """
+    answering = ProvenanceStats()
+    for _ in range(4):
+        answering.record(verify({"utr": "300000004412"}, ACME))
+
+    silent = ProvenanceStats()
+    for _ in range(2):
+        silent.record(verify({"utr": "300000004412"}, ACME))
+    for _ in range(2):
+        silent.record(verify({"utr": None}, ACME))
+
+    # Identical quality. Both are telling the truth about everything they claimed.
+    assert answering.field_failure_rate == silent.field_failure_rate == 0.0
+
+    # Only coverage separates them.
+    assert answering.claim_rate == 1.0
+    assert silent.claim_rate == 0.5
+    assert silent.claim_rate_by_field() == {"utr": 0.5}
+
+
 def test_stats_separate_the_item_rate_from_the_field_rate() -> None:
     """One bad field in a twelve-field item is a 100% item failure and an 8% field failure.
 
@@ -317,4 +344,4 @@ def test_stats_separate_the_item_rate_from_the_field_rate() -> None:
     assert stats.item_failure_rate == 0.5
     assert stats.fields_checked == 4
     assert stats.field_failure_rate == 0.25
-    assert stats.as_dict()["by_field"] == {"utr": 1}
+    assert stats.as_dict()["failures_by_field"] == {"utr": 1}

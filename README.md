@@ -182,6 +182,50 @@ of several. Nothing in a JSON Schema can express "the debits equal the credits" 
 lives in a Pydantic validator, checked after decoding, with one retry before the entry is
 dropped. Knowing where your own control stops is what makes the rest of it credible.
 
+## A theorem about our own design
+
+Architecture rule 1 says deterministic work comes before generative work. That is easy to
+assert and hard to check — until the verification layer makes it checkable.
+
+The provenance gate verifies an extracted UTR by finding it as a whole digit-run in the
+narration. Run that backwards:
+
+> **If the gate's verification procedure can be run in reverse to generate the value, the
+> model was never needed for that field.**
+
+A gate that verifies by `re.search(r"(?<!\d)\d{12}(?!\d)")` only ever *accepts* values a
+regex could have produced. The model cannot contribute anything the gate would let
+through, **by construction** — and it does not merely fail to help. It costs:
+
+| UTR extraction, 100 real narrations (71 contain one) | found | recall |
+|---|---|---|
+| `core.normalize.extract_utrs` — a regex | 71 | **100%** |
+| the LLM | 48 | 68% |
+
+Across all 4,528 narrations in `data/train`, **zero** contain a UTR that needs more than a
+plain regex — no split digits, no line-wraps. So `utr` and `reference_number` were removed
+from the parse schema entirely. Same argument, same outcome.
+
+### The corollary, and where the line actually falls
+
+What survives is exactly what the gate *cannot* generate, and that is not a coincidence —
+it is the same boundary seen from the other side:
+
+| field | how the gate verifies | can that run in reverse? | who does it |
+|---|---|---|---|
+| `utr` | find a 12-digit run | **yes** — that search *is* the extractor | regex |
+| `payment_method` | find a keyword | **yes** — scan the keyword list | *(under review)* |
+| `counterparty_name` | check the candidate's tokens are narration tokens | **no** | the model |
+
+The distinction is verification versus generation. Token-coverage can check whether
+`ACME INDUSTRIES` is evidenced by a narration; it cannot answer *which two of eight tokens
+are the company name*. There is no generative form of that check, and that is precisely
+the work that resists pattern matching.
+
+So the model does the part no regex can express, and everything else was never its job.
+Not because we decided the layers should be ordered that way, but because the gate we
+built to check the model turned out to describe the boundary.
+
 ## Untrusted input, and what actually defends against it
 
 Bank narrations are free text written by systems we do not control. They are untrusted

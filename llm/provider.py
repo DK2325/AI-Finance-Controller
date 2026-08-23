@@ -300,7 +300,15 @@ class MockProvider:
         results = [self._object(element, item, schema) for item in items]
 
         if self.fault is Fault.CROSS_CONTAMINATION and len(results) > 1:
-            results = _rotate_field(results, "utr")
+            # Whichever verifiable field this schema actually has. Identifiers left the
+            # parse schema when regex was shown to extract them better, so the fault has
+            # to follow the schema rather than name a field that may not be there --
+            # otherwise it silently stops injecting anything and the gate's test passes
+            # by measuring nothing.
+            for candidate in ("utr", "reference_number", "counterparty_name"):
+                if candidate in results[0]:
+                    results = _rotate_field(results, candidate)
+                    break
 
         out = {array_field: results}
         for name in schema.get("properties", {}):

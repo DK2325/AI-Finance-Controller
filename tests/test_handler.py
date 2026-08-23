@@ -49,7 +49,7 @@ def test_a_clean_run_verifies_everything() -> None:
     result = run()
     assert result.failed == []
     assert result.provenance.item_failure_rate == 0.0
-    assert all(o.fields and o.fields["utr"] for o in result.outcomes)
+    assert all(o.fields and o.fields["counterparty_name"] for o in result.outcomes)
 
 
 # ------------------------------------------------------ each fault, each code
@@ -198,7 +198,7 @@ def test_editing_a_prompt_without_bumping_it_invalidates_the_cache() -> None:
     """The reason prompt identity carries a checksum and not just a version string."""
     request = load("parse").request(ROWS)
     edited = type(request)(
-        **{**request.__dict__, "prompt_version": "parse.v2+DIFFERENTHASH"}
+        **{**request.__dict__, "prompt_version": "parse.v4+DIFFERENTHASH"}
     )
     assert cache_key(request, "m") != cache_key(edited, "m")
 
@@ -269,7 +269,7 @@ def test_per_item_tokens_are_an_apportionment_of_the_call() -> None:
 def test_audit_fields_carry_prompt_and_model_identity() -> None:
     outcome = run().outcomes[0]
     fields = outcome.as_audit_fields()
-    assert fields["prompt_version"].startswith("parse.v2+")
+    assert fields["prompt_version"].startswith("parse.v4+")
     assert fields["model_name"] == "mock-1"
     assert fields["cache_hit"] is False
 
@@ -297,15 +297,16 @@ def test_a_model_that_obeys_the_attacker_changes_nothing_structural() -> None:
     # Provenance passes honestly -- the digits really are in the narration. See
     # notes/injection.md: this gate was never the control that stops an adversary.
     assert outcome.ok
-    assert outcome.fields["utr"] == "300000009999"
 
     # What matters: nothing here is a decision. The outcome carries fields and a reason
     # code slot, and no attribute by which an item could declare itself matched.
     assert not hasattr(outcome, "matched")
     assert set(outcome.fields) <= {
-        "id", "counterparty_name", "payment_method", "utr",
-        "reference_number", "parse_confidence",
+        "id", "counterparty_name", "payment_method", "parse_confidence",
     }
+    # And identifiers are not the model's job at all any more -- regex extracts them at
+    # 100% where the model managed 68%. An attacker's UTR never reaches this schema.
+    assert "utr" not in outcome.fields
 
 
 def test_a_whitespace_stall_is_named_as_one_not_as_a_truncation() -> None:

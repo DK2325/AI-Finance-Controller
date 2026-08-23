@@ -1,85 +1,107 @@
 {
   "model": "nvidia/nemotron-3-super-120b-a12b",
   "n": 100,
-  "wall_seconds": 62.8,
+  "wall_seconds": 98.7,
   "batches": 5,
   "schema_failure_rate": 0.0,
-  "overall_failure_rate": 0.0,
-  "by_reason": {},
+  "overall_failure_rate": 0.02,
+  "by_reason": {
+    "LOW_PARSE_CONFIDENCE": 2
+  },
   "provenance": {
     "items": 100,
     "items_failed": 0,
     "item_failure_rate": 0.0,
-    "fields_checked": 280,
+    "fields_checked": 196,
     "fields_absent": 0,
     "field_failure_rate": 0.0,
-    "by_field": {}
+    "failures_by_field": {},
+    "fields_empty": 4,
+    "claim_rate": 0.98,
+    "claim_rate_by_field": {
+      "counterparty_name": 0.98,
+      "payment_method": 0.98
+    }
   },
   "provenance_by_field": {
     "counterparty_name": {
-      "present": 100
+      "empty": 2,
+      "present": 98
     },
     "payment_method": {
       "empty": 2,
       "present": 98
-    },
-    "reference_number": {
-      "empty": 66,
-      "present": 34
-    },
-    "utr": {
-      "empty": 52,
-      "present": 48
     }
   },
   "usage": {
     "calls": 5,
     "cached_calls": 0,
     "retries": 0,
-    "input_tokens": 7429,
-    "output_tokens": 7776,
-    "billed_tokens": 15205,
+    "input_tokens": 8020,
+    "output_tokens": 5346,
+    "billed_tokens": 13366,
     "tokens_served_from_cache": 0,
-    "seconds": 62.75
+    "seconds": 98.67
   },
   "call_log": [
     {
-      "seconds": 12.49,
-      "input_tokens": 1600,
-      "output_tokens": 1679,
+      "seconds": 23.29,
+      "input_tokens": 1716,
+      "output_tokens": 1198,
       "truncated": false,
+      "stalled": false,
+      "raw_chars": 3376,
       "retry": false
     },
     {
-      "seconds": 9.07,
-      "input_tokens": 1513,
-      "output_tokens": 1592,
+      "seconds": 9.8,
+      "input_tokens": 1626,
+      "output_tokens": 1031,
       "truncated": false,
+      "stalled": false,
+      "raw_chars": 2974,
       "retry": false
     },
     {
-      "seconds": 14.17,
-      "input_tokens": 1497,
-      "output_tokens": 1594,
+      "seconds": 17.09,
+      "input_tokens": 1616,
+      "output_tokens": 1046,
       "truncated": false,
+      "stalled": false,
+      "raw_chars": 3009,
       "retry": false
     },
     {
-      "seconds": 17.05,
-      "input_tokens": 1444,
-      "output_tokens": 1379,
+      "seconds": 28.36,
+      "input_tokens": 1561,
+      "output_tokens": 1030,
       "truncated": false,
+      "stalled": false,
+      "raw_chars": 3015,
       "retry": false
     },
     {
-      "seconds": 9.98,
-      "input_tokens": 1375,
-      "output_tokens": 1532,
+      "seconds": 20.13,
+      "input_tokens": 1501,
+      "output_tokens": 1041,
       "truncated": false,
+      "stalled": false,
+      "raw_chars": 3015,
       "retry": false
     }
   ],
-  "failure_details": [],
-  "tokens_per_item": 152.1,
+  "failure_details": [
+    {
+      "id": "EX0070",
+      "code": "LOW_PARSE_CONFIDENCE",
+      "detail": "parse_confidence 0.0 below floor 0.35"
+    },
+    {
+      "id": "EX0071",
+      "code": "LOW_PARSE_CONFIDENCE",
+      "detail": "parse_confidence 0.0 below floor 0.35"
+    }
+  ],
+  "tokens_per_item": 133.7,
   "counterparty_failures_sample": []
 }

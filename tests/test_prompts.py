@@ -130,7 +130,7 @@ def test_batch_sizes_match_what_was_measured() -> None:
 
 def test_version_id_carries_both_version_and_checksum() -> None:
     prompt = load("parse")
-    assert prompt.version_id.startswith("parse.v2+")
+    assert prompt.version_id.startswith("parse.v4+")
     assert len(prompt.version_id.split("+")[1]) == 12
 
 
@@ -236,7 +236,7 @@ def test_pinning_a_version_that_does_not_exist_is_refused() -> None:
 
 
 def test_pinning_the_version_that_does_exist_works() -> None:
-    assert load("parse", version=2).version == 2
+    assert load("parse", version=4).version == 4
 
 
 # --------------------------------------------------- no inline prompt strings
@@ -288,7 +288,7 @@ def test_no_prompt_text_is_duplicated_in_python() -> None:
 
 def test_prompt_files_are_the_only_prompts() -> None:
     assert {p.name for p in PROMPT_DIR.glob("*.md")} == {
-        "parse.v2.md", "journal.v1.md", "reason.v1.md"
+        "parse.v4.md", "journal.v1.md", "reason.v1.md"
     }
 
 
@@ -394,8 +394,8 @@ def test_an_entry_of_nothing_is_refused() -> None:
 def test_an_extra_field_is_refused() -> None:
     with pytest.raises(ValidationError):
         ParsedNarration(
-            id="A", counterparty_name="B", payment_method="upi", utr=None,
-            reference_number=[], parse_confidence=0.5, matched=True,
+            id="A", counterparty_name="B", payment_method="upi",
+            parse_confidence=0.5, matched=True,
         )
 
 
