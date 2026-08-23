@@ -37,7 +37,7 @@ from llm.schemas import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-JOBS = ("parse", "journal", "reason")
+JOBS = ("parse", "journal", "reason", "chaos")
 
 
 def write_prompt(tmp_path: Path, body: str, name: str = "tmp.v1.md") -> Path:
@@ -76,7 +76,7 @@ narration: <<<{narration}>>>
 # ------------------------------------------------------------ the three prompts
 
 
-def test_all_three_jobs_have_a_prompt() -> None:
+def test_every_job_has_a_prompt() -> None:
     assert sorted({p.job for p in registry().values()}) == sorted(JOBS)
 
 
@@ -119,10 +119,14 @@ def test_every_prompt_delimits_untrusted_text(job: str) -> None:
 
 
 def test_batch_sizes_match_what_was_measured() -> None:
-    """20 for the cheap jobs. Journal entries are longer, so 10 keeps output inside budget."""
+    """20 for the cheap jobs. Journal entries are longer, so 10 keeps output inside budget.
+
+    Chaos is 1: a panel types one request at a time, and there is nothing to batch.
+    """
     assert load("parse").batch_size == 20
     assert load("reason").batch_size == 20
     assert load("journal").batch_size == 10
+    assert load("chaos").batch_size == 1
 
 
 # ---------------------------------------------------------------- identity
@@ -288,7 +292,7 @@ def test_no_prompt_text_is_duplicated_in_python() -> None:
 
 def test_prompt_files_are_the_only_prompts() -> None:
     assert {p.name for p in PROMPT_DIR.glob("*.md")} == {
-        "parse.v5.md", "journal.v1.md", "reason.v1.md"
+        "parse.v5.md", "journal.v1.md", "reason.v1.md", "chaos.v1.md"
     }
 
 

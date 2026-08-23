@@ -52,11 +52,31 @@ def test_recon_fails_cleanly_on_a_batch_that_is_not_there(tmp_path) -> None:
     assert result.exit_code != 0
 
 
-def test_chaos_accepts_a_run_id() -> None:
-    """Still a Phase 6 no-op; it must at least parse its documented flags."""
-    assert runner.invoke(
-        app, ["chaos", "--run", "abc123", "--corruption", "unseen_narration"]
-    ).exit_code == 0
+def test_chaos_runs_a_corruption_and_reports_the_comparison() -> None:
+    """Failing gracefully IS the pass condition, so the command reports both sides.
+
+    --no-model-interpret because the deterministic keyword path is what has to carry a
+    live demonstration; the LLM interpreter is layered on with automatic fallback.
+    """
+    result = runner.invoke(
+        app,
+        ["chaos", "--in", "data/demo", "--corruption", "swap the date format",
+         "--no-model-interpret"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "date_format_swap" in result.output
+    assert "clean" in result.output and "corrupted" in result.output
+    assert "GRACEFUL" in result.output
+
+
+def test_chaos_names_which_path_interpreted_the_request() -> None:
+    result = runner.invoke(
+        app,
+        ["chaos", "--in", "data/demo", "--corruption", "truncate the narrations",
+         "--share", "0.2", "--no-model-interpret"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "interpreted by keyword" in result.output
 
 
 def test_eval_fails_cleanly_on_an_unknown_run() -> None:

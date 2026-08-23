@@ -196,8 +196,14 @@
       <h2>What it could not resolve</h2>
       <p class="sub">
         Every settlement is accounted for exactly once — matched, or an exception with a
-        reason. <span data-bind="free_share">—</span> of exceptions are explained with no
-        model call at all.
+        reason. <strong><span data-bind="free_share">—</span> of exceptions are settled
+        with no model call.</strong>
+      </p>
+      <p class="sub batch-note">
+        That share is a property of <em>this batch</em>, not a fixed capability. How many
+        payouts have no candidate credit at all depends on the data, so a batch where more
+        money simply has not arrived settles a larger share deterministically. Both figures
+        are real; neither is the system's score.
       </p>
     </div>
     <ul class="reasons" id="reasons"></ul>

@@ -241,13 +241,30 @@ class ExceptionReasonBatch(Strict):
 # is resolved, so a prompt naming a schema that does not exist fails at load time rather
 # than on the first live call.
 SCHEMAS: dict[str, type[BaseModel]] = {
+    "InterpretedChaosBatch": None,  # filled below; defined in llm/chaos_spec.py
     "ParsedNarrationBatch": ParsedNarrationBatch,
     "ProposedEntryBatch": ProposedEntryBatch,
     "ExceptionReasonBatch": ExceptionReasonBatch,
 }
 
 
+def _register_chaos() -> None:
+    """Registered late to avoid a cycle: chaos_spec imports Strict from here.
+
+    The corruption vocabulary lives in core/chaos.py, which is where the corruptions are;
+    the schema that constrains a model to it lives beside the other schemas.
+    """
+    from llm.chaos_spec import InterpretedChaos
+
+    class InterpretedChaosBatch(Strict):
+        results: list[InterpretedChaos]
+
+    SCHEMAS["InterpretedChaosBatch"] = InterpretedChaosBatch
+
+
 def schema_for(name: str) -> type[BaseModel]:
+    if SCHEMAS.get(name) is None and name == "InterpretedChaosBatch":
+        _register_chaos()
     try:
         return SCHEMAS[name]
     except KeyError:

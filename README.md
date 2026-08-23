@@ -361,6 +361,19 @@ a missing value. The alternative, a narrow row for cheap layers and a wide one f
 expensive ones, means every cross-layer query grows a branch, and the first query nobody
 writes is the one that would have found the problem.
 
+### The deterministic/generative boundary is in the interaction, not only the diagram
+
+**"Propose journal entry" is the only action in the product that spends tokens.** It is a
+button on one exception, not something the review queue does for every row it renders.
+
+Two consequences, and the second is the point:
+
+*   A reviewer can click through the entire demo — dashboard, every operating point, the
+    full exception queue — without running up a single rupee of inference cost.
+*   Where the model is and is not involved becomes visible by *using* the thing, rather
+    than by reading an architecture diagram and taking it on trust. Every screen that
+    renders instantly is a screen no model touched.
+
 ## Untrusted input, and what actually defends against it
 
 Bank narrations are free text written by systems we do not control. They are untrusted

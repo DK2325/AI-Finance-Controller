@@ -300,12 +300,59 @@ def eval_(
 
 @app.command()
 def chaos(
-    run: str = typer.Option(..., "--run", help="RUN_ID to corrupt."),
+    batch: Path = typer.Option(Path("data/demo"), "--in", help="Batch to corrupt."),
     corruption: str = typer.Option(..., "--corruption", help="Corruption type or free-text spec."),
+    model: Path = typer.Option(Path("runs/_models/v1"), "--model", help="Artifact directory."),
+    share: float | None = typer.Option(None, "--share", help="Fraction of bank rows to corrupt."),
+    no_model_interpret: bool = typer.Option(
+        False, "--no-model-interpret", help="Keyword mapping only; never call the LLM."
+    ),
 ) -> None:
-    """Inject novel, unmodelled corruption and watch the system route it to exceptions."""
-    typer.echo(_NOT_YET.format(phase=6))
-    typer.echo(f"  would inject '{corruption}' into run {run}")
+    """Inject novel, unmodelled corruption and watch the system route it to exceptions.
+
+    Failing gracefully IS the pass condition. Coverage collapsing while precision holds is
+    the system working; coverage holding while precision collapses is the only outcome
+    that matters, because that is money posted against the wrong invoice with no warning.
+    """
+    from core.chaos import apply_chaos
+    from core.pipeline import load_sources
+    from llm.chaos_spec import interpret
+    from model.artifact import Artifact
+    from model.chaos_run import compare
+
+    spec = interpret(corruption, use_model=not no_model_interpret)
+    if share is not None:
+        spec.share = max(0.05, min(1.0, share))
+
+    typer.echo(f"request  {corruption!r}")
+    typer.echo(f"  read as  {', '.join(spec.corruptions)}  "
+               f"({spec.share:.0%} of bank rows, interpreted by {spec.interpreted_by})")
+
+    artifact = Artifact.load(model)
+    clean = load_sources(batch)
+    corrupted, results = apply_chaos(clean, spec)
+
+    for result in results:
+        typer.echo(f"      {result.name:30} {result.rows_touched:6,} rows  "
+                   f"-- {result.description}")
+
+    before, after = compare(clean, corrupted, artifact, batch)
+
+    typer.echo("")
+    typer.echo(f"  {'':10} {'matched':>9} {'coverage':>10} {'precision':>11} {'false':>7}")
+    typer.echo(f"  {'clean':10} {before['matched']:9,} {before['coverage']:10.2%} "
+               f"{before['precision']:11.2%} {before['false_matches']:7}")
+    typer.echo(f"  {'corrupted':10} {after['matched']:9,} {after['coverage']:10.2%} "
+               f"{after['precision']:11.2%} {after['false_matches']:7}")
+
+    typer.echo("")
+    if after["false_matches"] <= before["false_matches"] or after["precision"] >= 0.99:
+        typer.echo("  GRACEFUL: coverage fell and precision held. The unknown went to the")
+        typer.echo("  exception queue rather than to a confident wrong answer.")
+    else:
+        typer.echo("  MIS-MATCHED: precision fell under corruption. This is the failure that")
+        typer.echo("  matters -- money posted against the wrong invoice with no warning.")
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

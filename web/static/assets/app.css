@@ -58,6 +58,8 @@ body {
 }
 .panel-head h2 { margin: 0 0 4px; font-size: 20px; letter-spacing: -0.01em; }
 .sub { margin: 0 0 20px; color: var(--ink-2); font-size: 15px; max-width: 68ch; }
+.sub.batch-note { font-size: 13.5px; color: var(--ink-3); margin-top: -12px; max-width: 76ch; }
+.sub.batch-note em { font-style: normal; font-weight: 600; color: var(--ink-2); }
 .loading { color: var(--ink-3); padding: 60px 0; text-align: center; }
 
 /* ------------------------------------------------------------- chosen point */
