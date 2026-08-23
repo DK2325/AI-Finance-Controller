@@ -64,14 +64,32 @@ RUN pip install --no-cache-dir -e . --no-deps
 # the same principle as every other guard here -- structurally impossible, not promised.
 RUN python -m api.selfcheck
 
-# The seed: a trained model and one scored run, both versioned deliverables.
+# The seed: a trained model and two scored runs, all versioned deliverables.
+#
+# v1-test is the one the screens open on. It is the sealed held-out set scored at the
+# pre-committed threshold, which makes the live demo the same evidence the README reports
+# rather than a friendlier run alongside it. v1-train is kept as a fallback so a cold boot
+# still has something to show if the test run is ever absent.
 COPY runs/_models/ ./runs/_models/
 COPY runs/v1-train/ ./runs/v1-train/
+COPY runs/v1-test/ ./runs/v1-test/
 
-# Batches the screens read: the demo batch for the one-click run, and the training batch
-# because the review queue shows narrations and amounts as evidence.
+# Batches the screens read: the demo batch for the one-click run, the training batch
+# because the review queue shows narrations and amounts as evidence, and the held-out set
+# because it is what the seeded run is over.
+#
+# data/test/.unsealed ships with it deliberately: it carries the sha256 map forward from
+# the deleted .sealed marker, so the integrity chain holds inside the image and not only
+# in the repository. A reviewer who pulls this image can check that the numbers on the
+# screen were computed from the bytes that were sealed.
 COPY data/demo/ ./data/demo/
 COPY data/train/ ./data/train/
+COPY data/test/ ./data/test/
+
+# Fail the build if the integrity record did not travel. Without the marker the served
+# numbers are still correct and no longer *checkable*, and an unverifiable claim inside a
+# shipped artifact is exactly the thing this project keeps refusing to make.
+RUN test -f ./data/test/.unsealed || (echo "data/test/.unsealed missing from image" && exit 1)
 
 # docker compose overrides the entrypoint with this to run migrations first. The hosted
 # deployment does not: Railway's Postgres is managed and the demo reads runs from the

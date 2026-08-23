@@ -399,3 +399,24 @@ body {
 .count-caveat { margin-top: 12px; font-size: 13.5px; color: var(--ink-2);
   background: #f2f5fb; border-left: 3px solid var(--accent);
   padding: 11px 14px; border-radius: 0 6px 6px 0; }
+
+/* -------------------------------------------------------------- held-out banner
+   Shown only when the API reports the run's batch carries an unsealing record. It is
+   deliberately the first thing on the page: the numbers below it are the submission's
+   headline, and a reader who cannot tell whether a live demo is held out will assume it
+   is not. */
+.heldout {
+  margin: 0 0 1.25rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--ok-border, #2f6f4f);
+  border-left-width: 4px;
+  border-radius: 4px;
+  background: var(--ok-bg, rgba(47, 111, 79, 0.08));
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.heldout strong { display: block; margin-bottom: 0.2rem; }
+.heldout-bad {
+  border-color: var(--bad-border, #8c2f2f);
+  background: var(--bad-bg, rgba(140, 47, 47, 0.1));
+}

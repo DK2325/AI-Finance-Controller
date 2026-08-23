@@ -17,7 +17,14 @@ node_modules/
 #   sealed-test Phase 7
 # Leading slash anchors this to the repo root -- a bare "runs/" would also match
 # notes/runs/, silently excluding the committed canonical artifacts.
-/runs/
+#
+# The trailing "*" is load-bearing and was missing until Phase 7. "/runs/" excludes the
+# DIRECTORY, and git will not descend into an excluded directory, so every "!" exception
+# below it was inert -- v1-train and _models were surviving only because they had been
+# added to the index before the rule existed, not because the exception worked. That went
+# unnoticed for five phases because the outcome looked right. "/runs/*" excludes the
+# contents instead, which git can re-include from.
+/runs/*
 
 # Two exceptions, because they are deliverables rather than scratch.
 #
@@ -29,6 +36,13 @@ node_modules/
 !/runs/_models/**
 !/runs/v1-train/
 !/runs/v1-train/**
+
+# The sealed-test run. Committed for the same reason v1-train is -- the deployed image
+# seeds from the repository, and this is the run the submission's headline numbers come
+# from. Before Phase 7 no run over data/test could exist; now that the seal is broken,
+# keeping it out would mean the live demo shows a superseded operating point.
+!/runs/v1-test/
+!/runs/v1-test/**
 
 # Still ignored: /runs/_datasets/ (regenerable intermediates), /runs/_llm_cache/, and
 # every ad-hoc run.

@@ -392,6 +392,38 @@ def test_concurrency_does_not_change_the_result() -> None:
     assert serial.provenance.as_dict() == parallel.provenance.as_dict()
 
 
+# Fields whose value is a measurement of the clock rather than of the run. Every one of
+# them is expected to differ between two executions, so comparing them says nothing about
+# reproducibility.
+TIMING_FIELDS = ("wall_seconds", "achieved_rpm", "seconds")
+
+
+def _without_timing(value):
+    """Strip clock-derived fields at every depth.
+
+    Stripping only the top level was a real defect and an instructive one: this test
+    asserted reproducibility while also, accidentally, asserting that two runs took the
+    same measured time. `Usage.as_dict()` carries an accumulated `seconds`, and every
+    `call_log` entry carries a per-call one. Rounded to 2dp, ordinary scheduler jitter was
+    enough to flip it, so the suite failed intermittently for a reason that had nothing to
+    do with what the test is about.
+
+    In this report the only such field below the top level is `usage.seconds`; `call_log`
+    is not carried in `as_dict()`. The walk is recursive anyway, so a timing field added
+    to any nested structure later cannot reintroduce the flake.
+
+    Same shape as the recurring mistake in notes/failure-modes.md: an instrument that is
+    correct and measures a different axis than the one it names.
+    """
+    if isinstance(value, dict):
+        return {
+            k: _without_timing(v) for k, v in value.items() if k not in TIMING_FIELDS
+        }
+    if isinstance(value, list):
+        return [_without_timing(v) for v in value]
+    return value
+
+
 def test_two_concurrent_runs_report_identically() -> None:
     """Reproducibility, not just order. Statistics are folded in batch order rather than
     finish order, so nothing depends on the interleaving."""
@@ -399,10 +431,37 @@ def test_two_concurrent_runs_report_identically() -> None:
     first = run_job("parse", rows, provider=_ReverseLatency(3), concurrency=4)
     second = run_job("parse", rows, provider=_ReverseLatency(3), concurrency=4)
 
-    def strip(report: dict) -> dict:
-        return {k: v for k, v in report.items() if k not in ("wall_seconds", "achieved_rpm")}
+    assert _without_timing(first.as_dict()) == _without_timing(second.as_dict())
 
-    assert strip(first.as_dict()) == strip(second.as_dict())
+
+def test_the_reproducibility_check_still_compares_something() -> None:
+    """Stripping timing must not have stripped the test.
+
+    A comparison that has had every differing field removed passes unconditionally, which
+    is the failure mode of the fix above. This asserts the surviving payload still carries
+    the substance -- token counts, call counts, per-item outcomes -- and that a genuine
+    difference in it is still caught.
+    """
+    rows = wide_rows()
+    result = run_job("parse", rows, provider=_ReverseLatency(3), concurrency=4)
+    stripped = _without_timing(result.as_dict())
+
+    assert stripped["usage"]["calls"] > 0
+    assert stripped["usage"]["billed_tokens"] > 0
+    assert stripped["succeeded"] > 0
+    assert stripped["items"], "the per-item outcomes did not survive the strip"
+
+    # The nested timing field is gone; everything else about usage is still compared.
+    assert "seconds" not in stripped["usage"]
+    assert "wall_seconds" not in stripped
+    assert set(stripped["usage"]) == {
+        "billed_tokens", "cached_calls", "calls", "input_tokens",
+        "output_tokens", "retries", "tokens_served_from_cache",
+    }
+
+    tampered = _without_timing(result.as_dict())
+    tampered["usage"]["billed_tokens"] += 1
+    assert tampered != stripped, "the comparison no longer notices a real difference"
 
 
 def test_a_failing_batch_does_not_take_the_others_with_it() -> None:

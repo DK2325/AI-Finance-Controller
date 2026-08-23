@@ -9,9 +9,15 @@ a cross-origin hop. The two paths are independent so neither can break the other
 
 THE SEEDED RUN COMES FROM THE REPOSITORY
 
-`runs/v1-train/` is committed. A cold start therefore has a completed run to show without
-having run anything and without a single database write, which is what makes "live public
-URL, seeded with a completed run" impossible to fail on a cold boot.
+`runs/v1-test/` and `runs/v1-train/` are committed. A cold start therefore has a completed
+run to show without having run anything and without a single database write, which is what
+makes "live public URL, seeded with a completed run" impossible to fail on a cold boot.
+
+The screens open on `v1-test`: the sealed held-out set, scored once at the pre-committed
+threshold. Seeding with `v1-train` instead would put a superseded operating point on the
+live URL while the README reported the held-out one, and a reader with no way to tell which
+is current would reasonably assume the running system is the honest number and the document
+is the optimistic one -- the exact inversion of the truth.
 """
 
 from __future__ import annotations

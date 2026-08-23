@@ -384,6 +384,45 @@ whose invoice was taken on the way to the decline, and nothing in the risk-cover
 accounts for that cost. All three sit at an identical calibrated probability, which is the
 isotonic step function's coarseness surfacing in a third place.
 
+### The evidence was on the page, and the question decided what could be seen
+
+**This is the most general version of the pattern this document is about, and it is worth
+stating separately because nothing was hidden, nothing was miscounted, and nobody was
+careless.**
+
+`notes/threshold.md` contains this table, written during operating-point selection:
+
+```
+value      on step   cum n   coverage   precision   false
+0.992754      196     803     67.99%    99.5019%       4   <- THE STEP
+0.956431        1     804     68.08%    99.5025%       4   <- selected
+0.945205       98     903     76.46%    99.3355%       6   <- breaches the floor
+```
+
+The `0.945205` row is annotated *"breaches the floor"*. It is the same step that, on the
+sealed set, consumes invoices below the operating point and denies them to the settlements
+that own them. The defect was sitting in a table that was studied closely, annotated by
+hand, and reasoned about at length — and it was invisible, because **the question being
+asked of that table was only ever "what does coverage do here?"**
+
+Under that question, `0.945205` is a row you decline to cross. Under the question "what
+happens to the candidates on this step when we decline to cross it?", it is a defect. The
+data supported both readings the whole time. Only one was asked.
+
+**Why this is worse than the four error messages above, and more useful.** Those were
+instruments that *described themselves inaccurately*; the fix each time was to classify
+rather than generalise, and a reader who checks the instrument finds the error. Here the
+instrument was correct, the number was correct, the annotation was correct, and the
+analysis was still incomplete — because completeness is relative to a question, and the
+question is the one thing a table cannot record.
+
+There is no mechanism that fixes this, which is why it is written down rather than
+converted into a test. The nearest thing to a remedy is a habit: **when a row is excluded
+from an analysis, ask what happens to the things it contains, not only to the metric it
+would have moved.** An abstention has a denominator too.
+
+---
+
 **Not fixed, and the reason is not an oversight.** Two things make fixing it here the wrong
 move, and both are worth stating so that "not fixed" does not read as "not noticed":
 

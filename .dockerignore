@@ -8,8 +8,18 @@ __pycache__/
 node_modules/
 .env
 # The image needs the demo batch (one-click run), the training batch (the review screen
-# shows narrations and amounts as evidence), and the seeded run. It does NOT need the
-# sealed test set, which stays out so the seal keeps meaning something.
-data/test/
+# shows narrations and amounts as evidence), and the seeded run.
+#
+# data/test/ IS shipped, and the reason it is no longer excluded is worth recording. While
+# the seal was intact this file kept the held-out set out of the image so that the seal
+# meant something in every artifact, not only in the repository. The seal was broken once,
+# at Phase 7, and the set has been scored and reported -- so excluding it now would buy no
+# protection and would cost the demo its evidence: the live URL would show a run at an
+# operating point the project pre-committed against.
+#
+# data/test/.unsealed travels with it. That file carries the sha256 map forward from
+# .sealed, so a reviewer who pulls the image can verify the served numbers were computed
+# from the bytes that were sealed. tests/test_seal.py enforces the same map in the repo,
+# and tests/test_deployment.py enforces that the marker is shipped.
 notes/
 tests/

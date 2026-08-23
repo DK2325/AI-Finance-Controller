@@ -1,0 +1,215 @@
+"""What the image must contain for the live URL to be evidence rather than a sample.
+
+The deployed instance seeds from the repository, so what it shows is decided by two files
+almost nobody reads: `.dockerignore` and `Dockerfile`. Before Phase 7 that arrangement put
+a run at a superseded operating point on the live URL while the README reported the
+held-out one -- no prose anywhere quoted a stale number, and the site rendered one anyway.
+
+**Stale state is worse than stale text, because nothing signals it.** A reader who cannot
+tell which of the two is current will reasonably assume the running system is honest and
+the document is optimistic, which was the exact inversion of the truth. These tests exist
+so that inversion cannot come back silently.
+
+They are static checks over the build configuration rather than a container build. Building
+an image in the unit suite would be slow and would need a daemon; what actually went wrong
+was a COPY line and an exclusion, and those are text.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DOCKERFILE = REPO_ROOT / "Dockerfile"
+DOCKERIGNORE = REPO_ROOT / ".dockerignore"
+GITIGNORE = REPO_ROOT / ".gitignore"
+
+SEEDED_RUN = "runs/v1-test/"
+FALLBACK_RUN = "runs/v1-train/"
+HELD_OUT_BATCH = "data/" + "test/"  # assembled, so this file does not name it literally
+MARKER = ".unsealed"
+
+
+@pytest.fixture(scope="module")
+def dockerfile() -> str:
+    return DOCKERFILE.read_text(encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def dockerignore() -> str:
+    return DOCKERIGNORE.read_text(encoding="utf-8")
+
+
+def test_the_held_out_run_is_copied_into_the_image(dockerfile: str) -> None:
+    assert f"COPY {SEEDED_RUN}" in dockerfile, (
+        f"the image does not copy {SEEDED_RUN}. The screens would fall back to the "
+        "training run, which is scored at a superseded operating point."
+    )
+
+
+def test_the_fallback_run_is_still_copied(dockerfile: str) -> None:
+    """A cold boot must have something to show even if the held-out run goes missing."""
+    assert f"COPY {FALLBACK_RUN}" in dockerfile
+
+
+def test_the_held_out_batch_is_copied(dockerfile: str) -> None:
+    assert f"COPY {HELD_OUT_BATCH}" in dockerfile, (
+        "the seeded run is over the held-out batch, so the batch has to ship with it or "
+        "the review screen has no evidence rows to read"
+    )
+
+
+def test_the_held_out_batch_is_not_excluded(dockerignore: str) -> None:
+    """The exclusion that was correct while the seal held, and is wrong now."""
+    active = [
+        line.strip()
+        for line in dockerignore.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    assert HELD_OUT_BATCH not in active, (
+        ".dockerignore still excludes the held-out batch, so COPY cannot ship it and the "
+        "seeded run would have no data behind it"
+    )
+
+
+def test_the_integrity_marker_travels_with_the_data() -> None:
+    """The marker is what makes the served numbers checkable inside the image.
+
+    Without it the numbers are still correct and no longer verifiable, and an
+    unverifiable claim inside a shipped artifact is the thing this project keeps refusing
+    to make.
+    """
+    marker = REPO_ROOT / HELD_OUT_BATCH / MARKER
+    assert marker.is_file(), f"{HELD_OUT_BATCH}{MARKER} is missing from the repository"
+
+    record = json.loads(marker.read_text(encoding="utf-8"))
+    assert record["sealed"] is False
+    assert record["sha256"], "the marker carries no hashes, so it proves nothing"
+
+
+def test_the_build_fails_if_the_marker_is_absent(dockerfile: str) -> None:
+    """A guard that is only a COPY line is a guard that fails silently."""
+    assert MARKER in dockerfile and "exit 1" in dockerfile, (
+        "the Dockerfile does not assert the integrity marker is present. A missing "
+        "marker would produce an image that serves unverifiable numbers and builds green."
+    )
+
+
+def test_the_integrity_chain_holds_in_the_repository() -> None:
+    """What ships is what was sealed -- recomputed, not asserted.
+
+    This is the same check `api/service.provenance` runs inside the container. Running it
+    here too means the repository cannot drift from the image's claim without the suite
+    noticing first.
+    """
+    batch = REPO_ROOT / HELD_OUT_BATCH
+    record = json.loads((batch / MARKER).read_text(encoding="utf-8"))
+
+    mismatched = [
+        name
+        for name, digest in record["sha256"].items()
+        if hashlib.sha256((batch / name).read_bytes()).hexdigest() != digest
+    ]
+    assert not mismatched, (
+        f"the held-out set no longer matches the hashes recorded when the seal broke: "
+        f"{mismatched}. The reported numbers were computed from different bytes."
+    )
+
+
+def test_the_run_committed_for_seeding_is_not_gitignored() -> None:
+    """The image seeds from the repository, so an ignored run never reaches the build."""
+    text = GITIGNORE.read_text(encoding="utf-8")
+    assert "!/runs/v1-test/" in text, (
+        "/runs/ is ignored wholesale and v1-test is not re-included, so the seeded run "
+        "would be absent from a fresh clone and from the image built out of it"
+    )
+
+
+def test_the_frontend_prefers_the_held_out_run() -> None:
+    """The COPY is half of it; the screen also has to open on that run."""
+    app_js = (REPO_ROOT / "web" / "static" / "assets" / "app.js").read_text(encoding="utf-8")
+    assert '"v1-test"' in app_js, "the frontend does not prefer the held-out run"
+
+    held_out_at = app_js.index('"v1-test"')
+    train_at = app_js.index('"v1-train"')
+    assert held_out_at < train_at, (
+        "the frontend checks for the training run before the held-out one, so it would "
+        "open on the superseded operating point whenever both are present"
+    )
+
+
+def test_the_provenance_check_is_presence_based_not_hardcoded() -> None:
+    """api/ may not name the held-out set, and should not need to.
+
+    The screen calls a run held out exactly when the batch carries an unsealing record.
+    That is enforced by tests/test_seal.py as a boundary; it is asserted here as a design
+    property, because a future edit that hardcodes the path would pass the seal lint only
+    by accident of spelling.
+    """
+    service = (REPO_ROOT / "api" / "service.py").read_text(encoding="utf-8")
+    assert f'UNSEAL_MARKER = "{MARKER}"' in service
+    assert HELD_OUT_BATCH not in service.replace("\\", "/")
+
+
+def test_the_screen_lands_on_the_point_the_run_was_scored_at() -> None:
+    """The displayed operating point must be the one the numbers were computed at.
+
+    This was wrong and wrong quietly. `dashboard()` chose the curve point whose threshold
+    was numerically *nearest* the stored one; on the held-out run that picked a point
+    0.000268 below the operating threshold, admitting one candidate the operating point
+    excludes. The screen showed 62.93% and 3,115 matched while every document said 62.91%
+    and 3,114.
+
+    A one-row disagreement between the live demo and the report is small and is exactly
+    the category of defect the re-seeding exists to remove, so it gets a test rather than
+    a fix and a hope.
+    """
+    from api.service import dashboard, load_run
+
+    summary = load_run("v1-test")
+    data = dashboard(summary)
+    point = data["operating_points"][data["selected_index"]]
+    stored = float(summary.meta["threshold"])
+
+    assert point["threshold"] >= stored, (
+        f"the screen landed on threshold {point['threshold']}, below the stored operating "
+        f"point {stored}. That point admits candidates the run did not auto-match."
+    )
+
+    lower = [
+        p["threshold"]
+        for p in data["operating_points"]
+        if stored <= p["threshold"] < point["threshold"]
+    ]
+    assert not lower, (
+        f"a point at {lower} sits between the operating threshold and the one selected, "
+        "so the screen is not showing the tightest equivalent point"
+    )
+
+    assert point["matched"] == summary.meta["n_matched_at_threshold"], (
+        f"the screen shows {point['matched']:,} matched; the run recorded "
+        f"{summary.meta['n_matched_at_threshold']:,}"
+    )
+
+
+def test_the_dashboard_reports_held_out_provenance_with_a_live_integrity_check() -> None:
+    """The banner's claim is recomputed inside the service, not read from a file."""
+    from api.service import dashboard, load_run
+
+    provenance = dashboard(load_run("v1-test"))["provenance"]
+    assert provenance["held_out"] is True
+    assert provenance["scored_at_threshold"] == 0.9564
+    assert provenance["integrity"]["intact"] is True
+    assert provenance["integrity"]["checked"] == 5
+    assert provenance["integrity"]["mismatched"] == []
+
+
+def test_a_run_over_a_non_held_out_batch_does_not_claim_to_be_held_out() -> None:
+    """The banner must be impossible to show for a batch carrying no unsealing record."""
+    from api.service import dashboard, load_run
+
+    assert dashboard(load_run("v1-train"))["provenance"]["held_out"] is False

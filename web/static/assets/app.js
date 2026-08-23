@@ -36,8 +36,11 @@ async function boot() {
     const runs = await (await fetch("/api/runs")).json();
     if (!runs.runs.length) throw new Error("no runs are present");
 
-    /* Prefer the seeded run; otherwise whichever has the most settlements. */
+    /* Prefer the held-out run, then the training run, then whichever is largest.
+       v1-test is the sealed test set at the pre-committed threshold -- the same numbers
+       the README reports. v1-train is a fallback for a container built without it. */
     const seeded =
+      runs.runs.find((r) => r.run_id === "v1-test") ||
       runs.runs.find((r) => r.run_id === "v1-train") ||
       runs.runs.slice().sort((a, b) => b.settlements - a.settlements)[0];
 
@@ -66,6 +69,35 @@ function render(data) {
 
   document.getElementById("foot-run").textContent =
     `run ${data.run_id} · batch ${data.batch_dir} · model ${data.model_version || "—"}`;
+
+  /* The held-out banner. Driven entirely by what the API reports about the batch, so a
+     run over a non-held-out batch cannot render this and a held-out one cannot hide it.
+     The integrity line is the part worth showing: it says the files these numbers came
+     from still hash to what they hashed to when the seal was broken. */
+  const prov = data.provenance || {};
+  const banner = document.getElementById("heldout");
+  if (banner) {
+    if (prov.held_out) {
+      const thr = prov.scored_at_threshold;
+      const integrity = prov.integrity || {};
+      const verified =
+        integrity.intact === true
+          ? `all ${integrity.checked} files verified against the sealed hashes`
+          : integrity.intact === false
+            ? `INTEGRITY FAILURE on ${(integrity.mismatched || []).join(", ")}`
+            : "integrity record incomplete";
+      document.getElementById("heldout-detail").textContent =
+        `This run is the sealed test set, scored once at the pre-committed threshold` +
+        (thr ? ` ${thr}` : "") +
+        `. The threshold was chosen and committed before the seal was broken, and nothing ` +
+        `was retuned afterwards — so these are the same numbers the README reports, not a ` +
+        `friendlier run shown alongside them. Integrity: ${verified}.`;
+      banner.hidden = false;
+      if (integrity.intact === false) banner.classList.add("heldout-bad");
+    } else {
+      banner.hidden = true;
+    }
+  }
 
   update();
 }

@@ -225,17 +225,97 @@ def step_sizes(points: list[dict]) -> list[int]:
     return sizes
 
 
+# The unsealing record a held-out batch carries. Detected by its presence rather than by
+# naming a directory: api/ is a guarded package and tests/test_seal.py fails the build if
+# it names the held-out set in a string literal. Presence-based detection is also the more
+# honest rule -- the screen calls a run held out exactly when the batch it read carries a
+# record saying so, rather than because a path was hardcoded to match.
+UNSEAL_MARKER = ".unsealed"
+
+
+def provenance(summary: RunSummary) -> dict:
+    """Whether this run is over a held-out batch, and what backs that claim.
+
+    Returned on every dashboard response so the UI cannot show held-out numbers without
+    saying they are held out, and cannot claim it for a batch that is not.
+    """
+    marker = Path(summary.batch_dir) / UNSEAL_MARKER
+    if not marker.is_file():
+        return {"held_out": False}
+
+    try:
+        record = json.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        # A marker we cannot read is not evidence. Say nothing rather than assert.
+        return {"held_out": False}
+
+    return {
+        "held_out": True,
+        "sealed_at_phase": record.get("sealed_at_phase"),
+        "unsealed_at_phase": record.get("unsealed_at_phase"),
+        "scored_at_threshold": record.get("scored_at_threshold"),
+        "threshold_precommitted_at": record.get("threshold_precommitted_at"),
+        # The integrity chain, checked here rather than asserted. The marker carries the
+        # sha256 of every file as it was when the seal broke; this recomputes them against
+        # what the container actually has on disk. A reviewer who pulls the image gets the
+        # answer from the running service instead of having to take the repo's word.
+        "integrity": _integrity(marker.parent, record.get("sha256") or {}),
+    }
+
+
+def _integrity(batch_dir: Path, recorded: dict) -> dict:
+    """Recompute the sealed hashes against what is on disk now."""
+    import hashlib
+
+    if not recorded:
+        return {"checked": 0, "intact": None}
+
+    mismatched = []
+    for name, digest in sorted(recorded.items()):
+        path = batch_dir / name
+        try:
+            actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            mismatched.append(name)
+            continue
+        if actual != digest:
+            mismatched.append(name)
+
+    return {
+        "checked": len(recorded),
+        "intact": not mismatched,
+        "mismatched": mismatched,
+    }
+
+
 def dashboard(summary: RunSummary) -> dict:
     """Everything the dashboard screen needs, in one response."""
     points = operating_points(summary)
     sizes = step_sizes(points)
     selected = summary.meta.get("threshold")
 
+    # The point whose SELECTION matches the operating point, not the point whose threshold
+    # is numerically nearest. Scoring at T admits every candidate with confidence >= T, so
+    # the equivalent curve point is the lowest threshold at or above T -- there is no
+    # candidate between them by construction, because curve thresholds are the distinct
+    # confidences.
+    #
+    # Nearest-by-distance is wrong and wrong quietly. On the held-out run the stored
+    # threshold 0.9564 sits 0.000268 below a point at 0.956132 and 0.009323 below the
+    # point at 0.965723; distance picks the first, which admits one candidate the operating
+    # point excludes. The screen then showed 62.93% and 3,115 matched where every document
+    # said 62.91% and 3,114 -- a one-row disagreement between the live demo and the report,
+    # which is the category of defect this seeding change exists to remove.
     chosen = 0
     if selected is not None and points:
-        chosen = min(
-            range(len(points)),
-            key=lambda i: abs(points[i]["threshold"] - float(selected)),
+        threshold = float(selected)
+        at_or_above = [i for i, p in enumerate(points) if p["threshold"] >= threshold]
+        chosen = (
+            min(at_or_above, key=lambda i: points[i]["threshold"])
+            if at_or_above
+            # Every point is below the operating threshold: nothing would be auto-matched.
+            # The most conservative real point is the honest thing to land on.
+            else max(range(len(points)), key=lambda i: points[i]["threshold"])
         )
 
     score = summary.report.get("score", {})
@@ -258,6 +338,8 @@ def dashboard(summary: RunSummary) -> dict:
         # Stated on every response so the UI can never render an uncalibrated run as if it
         # were the real curve -- architecture rule 3.
         "calibration_note": summary.meta.get("calibration_note", ""),
+        # Whether these numbers are held out, and the evidence for it.
+        "provenance": provenance(summary),
     }
 
 
