@@ -6,7 +6,6 @@ Phase 1 generate, Phase 2 eval, Phase 3-5 recon, Phase 6 chaos.
 
 from __future__ import annotations
 
-from enum import StrEnum
 from pathlib import Path
 
 import typer
@@ -19,11 +18,6 @@ app = typer.Typer(
 )
 
 
-class Difficulty(StrEnum):
-    easy = "easy"
-    hard = "hard"
-
-
 _NOT_YET = "[phase {phase}] not implemented yet - Phase 0 registers this command only."
 
 
@@ -31,7 +25,6 @@ _NOT_YET = "[phase {phase}] not implemented yet - Phase 0 registers this command
 def generate(
     rows: int = typer.Option(1000, "--rows", help="Number of truth rows to synthesise."),
     seed: int = typer.Option(42, "--seed", help="Deterministic seed. Same seed, same bytes."),
-    difficulty: Difficulty = typer.Option(Difficulty.hard, "--difficulty"),
     out: Path = typer.Option(..., "--out", help="Output directory for the batch."),
     exclude_cases: str = typer.Option(
         "",
@@ -52,7 +45,7 @@ def generate(
         raise typer.Exit(code=2) from exc
 
     totals = manifest["totals"]
-    typer.echo(f"wrote {out}  (seed={seed}, difficulty={difficulty.value})")
+    typer.echo(f"wrote {out}  (seed={seed})")
     typer.echo(
         f"  {totals['invoices']} invoices, {totals['gateway_rows']} gateway rows, "
         f"{totals['bank_rows']} bank rows, {totals['truth_rows']} truth rows"
@@ -108,7 +101,8 @@ def recon(
                 run_id=run_id,
                 batch_dir=str(in_dir).replace("\\", "/"),
                 predictions=[
-                    Prediction(Triple(*s.triple), s.probability, "model") for s in selected
+                    Prediction(Triple(*s.triple), s.probability, "model", s.row.entity_id)
+                    for s in selected
                 ],
                 meta={
                     "calibrated": True,

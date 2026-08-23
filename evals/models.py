@@ -29,6 +29,14 @@ class Prediction:
     triple: Triple
     confidence: float
     layer: str = "unknown"
+    # Which settlement row this prediction is for. NOT part of the triple and not part of
+    # scoring -- a triple is (invoice, settlement batch, transaction), and several rows of
+    # one payout batch produce distinct triples that share a settlement_id.
+    #
+    # Carried because the operating-point explorer needs to count *settlements* matched at
+    # a given threshold, and deriving that from a triple count is wrong by a handful of
+    # rows -- which showed up as a cost of Rs 0.00 at the most permissive operating point.
+    entity_id: str = ""
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.confidence <= 1.0:

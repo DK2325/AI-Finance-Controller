@@ -65,6 +65,7 @@ class FilesystemRunStore:
                             "txn_id": prediction.triple.txn_id,
                             "confidence": prediction.confidence,
                             "layer": prediction.layer,
+                            "entity_id": prediction.entity_id,
                         },
                         sort_keys=True,
                     )
@@ -108,6 +109,7 @@ class FilesystemRunStore:
                             ),
                             confidence=float(row["confidence"]),
                             layer=row.get("layer", "unknown"),
+                            entity_id=row.get("entity_id", ""),
                         )
                     )
 

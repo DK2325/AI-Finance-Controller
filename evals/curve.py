@@ -39,6 +39,24 @@ class CurvePoint:
     n_true_positives: int
     n_false_positives: int
     orphan_refusal_rate: float
+    # Absolute money, integer paise. Carried on the point rather than derived by the
+    # consumer: `wrong_money = money_error_ratio * total_money` is float arithmetic on an
+    # amount, which is the one thing this project does not do. The slider needs a rupee
+    # figure at every operating point, and it should read one rather than compute one.
+    total_money: int = 0
+    wrong_money: int = 0
+
+    @property
+    def precision_interval(self) -> tuple[float, float]:
+        """95% Wilson interval. The slider shows this, not the point estimate alone.
+
+        At low coverage the interval is wide because the count is small, and that widening
+        is information: it says the system cannot yet distinguish this operating point
+        from a worse one.
+        """
+        from evals.metrics import wilson
+
+        return wilson(self.n_true_positives, self.n_predicted)
 
     @classmethod
     def from_score(cls, score: Score) -> CurvePoint:
@@ -53,6 +71,8 @@ class CurvePoint:
             n_true_positives=score.n_true_positives,
             n_false_positives=score.n_false_positives,
             orphan_refusal_rate=score.orphan_refusal_rate,
+            total_money=score.total_money,
+            wrong_money=score.wrong_money,
         )
 
 
@@ -101,7 +121,14 @@ class RiskCoverageCurve:
         return {
             "n_points": len(self.points),
             "is_degenerate": self.is_degenerate,
-            "points": [asdict(p) for p in self.points],
+            "points": [
+                {
+                    **asdict(p),
+                    "precision_ci_low": round(p.precision_interval[0], 6),
+                    "precision_ci_high": round(p.precision_interval[1], 6),
+                }
+                for p in self.points
+            ],
         }
 
     def save(self, path: Path | str) -> None:
@@ -113,7 +140,13 @@ class RiskCoverageCurve:
     @classmethod
     def load(cls, path: Path | str) -> RiskCoverageCurve:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
-        return cls(points=[CurvePoint(**p) for p in data["points"]])
+        fields = {f for f in CurvePoint.__dataclass_fields__}
+        return cls(
+            points=[
+                CurvePoint(**{k: v for k, v in p.items() if k in fields})
+                for p in data["points"]
+            ]
+        )
 
 
 def build_curve(predictions: list[Prediction], batch: Batch) -> RiskCoverageCurve:

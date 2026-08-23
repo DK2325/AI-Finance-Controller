@@ -28,8 +28,7 @@ def test_each_command_has_its_own_help(command: str) -> None:
 def test_generate_accepts_its_documented_flags(tmp_path) -> None:
     result = runner.invoke(
         app,
-        ["generate", "--rows", "10", "--seed", "42", "--difficulty", "hard",
-         "--out", str(tmp_path)],
+        ["generate", "--rows", "10", "--seed", "42", "--out", str(tmp_path)],
     )
     assert result.exit_code == 0
 
@@ -70,8 +69,14 @@ def test_eval_fails_cleanly_on_an_unknown_run() -> None:
     assert "no run" in result.output.lower() or "no run" in str(result.stderr).lower()
 
 
-def test_difficulty_rejects_an_unknown_value(tmp_path) -> None:
+def test_the_difficulty_flag_is_gone_rather_than_ignored(tmp_path) -> None:
+    """It was accepted and did nothing for five phases.
+
+    A flag that lies about what it does is worse than an absent flag: it invites someone
+    to rely on it. Compound-case generation is a datagen feature this submission does not
+    need, so the flag is removed rather than wired.
+    """
     result = runner.invoke(
-        app, ["generate", "--difficulty", "impossible", "--out", str(tmp_path)]
+        app, ["generate", "--difficulty", "hard", "--out", str(tmp_path)]
     )
-    assert result.exit_code != 0
+    assert result.exit_code != 0, "an unknown flag must be refused, not silently ignored"

@@ -20,9 +20,6 @@ Last updated 23 Aug 2026, end of Phase 5. Read this first when picking the build
 | 7 sealed test set, failure analysis | — |
 | 8 README, video, rehearsal | — |
 
-**Six days ahead of schedule.** BUILD.md put Phase 5 on 30–31 Aug; it finished on the 23rd.
-Buffer is 5 Sept and should stay unspent.
-
 ## Carried into Phase 6 and 7 — read notes/phase-5-report.md
 
 Three things that must not be re-derived or accidentally assumed:
@@ -84,6 +81,31 @@ starts turning up findings at Phase 5's rate, that is a signal the approach is w
 than a good sign — what is left is making the thing visible.
 
 ---
+
+## Phase 8 cleanup list — record only, do not act before Phase 8
+
+**The line: anything about how the project was managed goes; anything about how the system
+works or why it works stays.**
+
+Delete before the repo goes public:
+
+- `BUILD.md` — an internal plan with dates and phase slots. Not part of the deliverable.
+- `notes/RESUME.md` — this file. A session handoff, not evidence.
+
+Keep, and link from the README, because they are evidence:
+
+- `notes/schemas.md` — where the data schemas come from, with sources
+- `notes/failure-modes.md` — what this gets wrong, and how the mistakes were found
+- `notes/threshold.md` — the operating point, calibration, why Wilson
+- `notes/injection.md` — untrusted input, and the correction
+- `notes/pricing.md` — the cost band, its sources and its date
+- `notes/decisions.md`, `notes/metrics.md`, `notes/distribution.md`,
+  `notes/worked-examples.md`
+- `notes/spikes/` and `notes/measurements/` — the raw results, including the experiments
+  whose conclusions turned out to be wrong
+
+Also: **no schedule or pacing references** anywhere — commit messages, file contents or
+documentation. Commit messages describe the change and the reasoning.
 
 ## Standing reminders
 

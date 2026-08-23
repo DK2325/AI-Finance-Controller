@@ -1,6 +1,6 @@
 # Phase 5 — LLM exception layer and audit trail
 
-**Complete, 23 August 2026.** Six days ahead of BUILD.md's 30–31 August slot.
+**Complete, 23 August 2026.**
 
 ---
 

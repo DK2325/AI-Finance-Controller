@@ -166,7 +166,7 @@ ledgerloop/
 **CLI (canonical interface, Windows-safe):**
 
 ```
-ledgerloop generate --rows N --seed S --difficulty {easy,hard} --out DIR
+ledgerloop generate --rows N --seed S --out DIR
 ledgerloop recon --in DIR [--mock-llm] [--threshold T]
 ledgerloop eval --run RUN_ID
 ledgerloop chaos --run RUN_ID --corruption TYPE
@@ -174,8 +174,25 @@ ledgerloop chaos --run RUN_ID --corruption TYPE
 
 **Stack:** Python 3.11+, `uv`, `ruff`, Typer, Polars/pandas, RapidFuzz,
 scikit-learn, LightGBM, Pydantic, FastAPI, SQLAlchemy, Alembic,
-**PostgreSQL 16**, Next.js, Tailwind, shadcn/ui, Recharts.
+**PostgreSQL 16**, ~~Next.js, Tailwind, shadcn/ui, Recharts~~ static HTML/CSS/JS.
 **Docker Compose is the primary run path**, not an optional extra.
+
+> **Two deviations from this file, recorded here so the spec and the code do not disagree.**
+>
+> **1. The frontend is static HTML/CSS/JS, not Next.js + Tailwind + shadcn/ui.** Phase 6's
+> exit criterion is *"`docker compose up` and a stranger understands the product in 60
+> seconds."* A React toolchain puts an `npm install` and a build step inside that path, and
+> Phase 0 had already ruled that out for the same reason (`web/server.js`: "zero
+> dependencies on purpose: the compose stack must never block on an npm install").
+> Reversing that decision in the phase whose criterion is "works on a stranger's machine"
+> would trade demo reliability for a stack line. Three screens and one slider need no
+> routing, SSR or component library; the slider is ~60 lines of vanilla JS over a JSON
+> endpoint.
+>
+> **2. `--difficulty {easy,hard}` is removed from the CLI.** It was accepted and did
+> nothing from Phase 1 onward. Wiring it means compound-case generation — a `datagen/`
+> feature this submission does not need — and a flag that lies about what it does is worse
+> than an absent flag, because it invites someone to rely on it.
 
 ### Database rules
 
