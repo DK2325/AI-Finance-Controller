@@ -82,7 +82,7 @@ def recon(
         from evals.models import Prediction, Run, Triple
         from evals.runs import FilesystemRunStore
         from model.artifact import Artifact, FeatureSchemaMismatch
-        from model.predict import predict_batch
+        from model.predict import reconcile_batch
 
         try:
             artifact = Artifact.load(model)
@@ -90,10 +90,18 @@ def recon(
             typer.echo(f"error: {exc}", err=True)
             raise typer.Exit(code=3) from exc
 
-        scored = predict_batch(in_dir, artifact)
-        selected = [
-            s for s in scored if threshold is None or s.probability >= threshold
-        ]
+        point = threshold if threshold is not None else artifact.operating_point["threshold"]
+        outcome = reconcile_batch(in_dir, artifact, threshold=point)
+
+        # Predictions carry EVERY resolved candidate with its calibrated probability, not
+        # only those above the operating point. The risk-coverage curve is a sweep across
+        # thresholds, so a run storing only its accepted matches cannot produce one -- the
+        # curve collapsed from 23 points to 3 the first time this was got wrong.
+        #
+        # The exceptions, by contrast, are the ones at the operating point, because an
+        # exception is a decision and a decision needs a threshold to have been taken.
+        # `n_matched_at_threshold` in meta is what the accounting invariant checks against.
+        selected = outcome.all_resolved
         run_id = run or f"model-{Path(in_dir).name}"
         FilesystemRunStore().save(
             Run(
@@ -111,12 +119,30 @@ def recon(
                     "trained_on": artifact.trained_on,
                     "excluded_cases": artifact.excluded_cases,
                     "mock_llm": mock_llm,
+                    "n_settlements": outcome.enumeration.n_settlements,
+                    "n_matched_at_threshold": len(outcome.matches),
+                    "threshold": point,
+                    "deterministic_share": round(
+                        outcome.enumeration.deterministic_share(), 4
+                    ),
                 },
+                exceptions=[r.as_dict() for r in outcome.enumeration.exceptions],
             )
         )
+        n = outcome.enumeration.n_settlements
         typer.echo(f"scored {in_dir} with {artifact.model_version} -> run '{run_id}'")
-        typer.echo(f"  {len(selected)} matches of {len(scored)} resolved candidates")
+        typer.echo(f"  {len(outcome.matches)} matches, "
+                   f"{len(outcome.enumeration.exceptions)} exceptions"
+                   f"  ({len(outcome.matches) + len(outcome.enumeration.exceptions)}"
+                   f" of {n} settlements)")
+        typer.echo(f"  {len(selected)} resolved candidates stored for the curve sweep")
         typer.echo(f"  calibrated probabilities ({artifact.calibration['method']})")
+        typer.echo(
+            f"  {outcome.enumeration.deterministic_share():.1%} of exceptions carry a "
+            "deterministic reason code and never reach a model"
+        )
+        for code, count in outcome.enumeration.by_reason().items():
+            typer.echo(f"      {code:26} {count:6,}")
         return
     from evals.models import Prediction, Run, Triple
     from evals.runs import FilesystemRunStore
@@ -254,6 +280,23 @@ def eval_(
     typer.echo(f"  false auto-matches       {s['n_false_positives']}")
     degenerate = " (degenerate)" if report["curve"]["is_degenerate"] else ""
     typer.echo(f"  curve points             {report['curve']['n_points']}{degenerate}")
+
+    if "reason_codes" in report:
+        rc = report["reason_codes"]
+        acc = report.get("accounting", {})
+        typer.echo("")
+        typer.echo(f"  reason-code actionability {rc['accuracy']:.2%} "
+                   f"({rc['justified']}/{rc['justified'] + rc['unjustified']})")
+        for code, detail in rc["by_code"].items():
+            rate = f"{detail['accuracy']:.1%}" if detail["accuracy"] is not None else "n/a"
+            typer.echo(f"      {code:26} {rate:>7}  ({detail['justified']}/{detail['total']})")
+        if acc:
+            mark = "OK" if acc.get("complete") else "INCOMPLETE"
+            typer.echo(
+                f"  every settlement accounted for: {mark} "
+                f"({acc['matched']} matched + {acc['exceptions']} exceptions "
+                f"= {acc['accounted_for']} of {acc['settlements']})"
+            )
     typer.echo(f"\n  written to runs/{run}/")
 
 

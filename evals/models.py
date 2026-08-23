@@ -62,3 +62,8 @@ class Run:
     batch_dir: str
     predictions: list[Prediction] = field(default_factory=list)
     meta: dict = field(default_factory=dict)
+    # The other half of the run. Stored beside the predictions rather than derived later,
+    # because "matched + exceptions == every settlement" is only checkable if both halves
+    # were written by the same run -- recomputing exceptions afterwards would compare a
+    # run against a re-run.
+    exceptions: list[dict] = field(default_factory=list)

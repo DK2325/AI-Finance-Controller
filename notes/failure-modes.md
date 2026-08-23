@@ -532,3 +532,58 @@ Not a resolution bug; a discrimination one, and the same root cause as the secti
 code is technically true and still unactionable: it sends an operator to check a duplicate
 that is not one, when the real fault is that `core/invoices.py` inferred the wrong invoice
 through the narration. Left for Phase 7, sized at two rows in 4,945.
+
+---
+
+# How do you know your numbers are real?
+
+The honest answer, and the one worth giving to a panel:
+
+> **Every metric answers exactly one question. The failures in this project have
+> consistently come from the questions no metric was asking.**
+
+Not one of the incidents below was a broken instrument. Every one was a correct instrument
+answering its question correctly while something moved along an axis it did not measure.
+That is a harder failure to catch than a bug, because there is nothing to notice: the
+dashboard is green and it is telling the truth.
+
+| the metric | answered correctly | while this moved, unwatched |
+|---|---|---|
+| ECE on a single split | how well calibrated, in sample | out-of-sample calibration -- 0.00000 vs 0.0104 |
+| spike schema-failure rate | conformance *and* transport, merged | which of the two was failing -- 8% was the rate limiter |
+| batch contamination check | whether raw strings matched | whether a *normalised* value matched -- a real cross-contamination filed as harmless |
+| provenance failure rate | of the claims made, how many were true | how many claims were made -- 0.0% failures while a third of UTRs vanished |
+| reason-code agreement | whether two parties said the same thing | whether either was right; one had been told the other's answer |
+| ECE and reliability diagrams | whether probabilities mean what they say | whether they can *separate* two candidates -- 99.7% are exact ties |
+
+The last one is the sharpest. Isotonic was chosen on measured ECE and it is the better
+calibrator; **calibration and discrimination are different properties**, we optimised hard
+for the first, and the second was invisible until a resolution defect was traced backwards
+into it.
+
+## What follows from this
+
+**A metric is a question, so ask what question it is not asking.** Every rate here now has
+a deliberate counterpart:
+
+| quality | coverage |
+|---|---|
+| precision | coverage, and the whole risk-coverage curve |
+| provenance failure rate | claim rate, per field |
+| calibration (ECE) | discrimination -- *named as the open gap, not yet measured* |
+| reason-code actionability | scored against truth, per code, never aggregated alone |
+
+**The three diagnostics, applied before a number is believed:**
+
+1. *Is this reading physically possible?* — 8,000 tokens producing 193 characters was not,
+   and two experiments were spent because nobody asked.
+2. *What result would count as bad, and could it actually occur?* — a question with no
+   possible bad answer is a formality, not a measurement.
+3. *What moved that this cannot see?* — the one that catches everything in the table above.
+
+**And a structural habit:** normalisation at a boundary destroys the evidence you need when
+the thing behind that boundary misbehaves, so keep the raw value alongside the clean one.
+
+None of this makes the numbers in this README certain. It makes the *uncertainty* the
+subject of measurement rather than a matter of confidence, which is the only version of
+the claim worth making.

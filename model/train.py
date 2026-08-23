@@ -169,17 +169,35 @@ def select_operating_point(
 def resolve_indices(rows: list[dict], p: np.ndarray) -> np.ndarray:
     """Which candidates survive resolution, as a boolean mask.
 
-    Mirrors model/predict.py exactly: greedy by probability, one transaction per
-    settlement and one settlement per invoice. Truth-blind -- it reads ids and scores,
-    never labels.
+    Mirrors model/predict.resolve exactly -- and "exactly" is load-bearing, because the
+    operating point is chosen from what this returns and then applied to what *that*
+    returns. If the two resolvers disagree, the threshold describes a system nobody runs.
 
-    Selecting the operating point on *unresolved* candidates measures something no
-    merchant ever sees. Resolution discards most wrong candidates before anything is
-    auto-matched, so candidate-level precision understates the system by a wide margin:
-    99.34% against 99.88% measured here. Tuning on the wrong one produces a needlessly
-    conservative threshold.
+    They had drifted. This used `np.argsort(-p)`, an unstable sort, so ties were broken by
+    whatever order the sort happened to leave them in -- not even reproducibly across numpy
+    versions. Since 99.7% of candidates share an exact calibrated probability, that was not
+    an edge case: it was how nearly every contested invoice got decided, including during
+    operating-point selection.
+
+    Ties now break on the same evidence, in the same order, as inference does:
+    date proximity, rule tier, invoice-link strength, then ids as a deterministic backstop.
+
+    Selecting the operating point on *unresolved* candidates measures something no merchant
+    ever sees. Resolution discards most wrong candidates before anything is auto-matched,
+    so candidate-level precision understates the system by a wide margin. Tuning on the
+    wrong one produces a needlessly conservative threshold.
     """
-    order = np.argsort(-p)
+    order = sorted(
+        range(len(rows)),
+        key=lambda i: (
+            -p[i],
+            abs(float(rows[i].get("date_delta_days", 0.0) or 0.0)),
+            -float(rows[i].get("rule_score", 0.0) or 0.0),
+            -float(rows[i].get("invoice_score", 0.0) or 0.0),
+            rows[i].get("entity_id", ""),
+            rows[i].get("txn_id", ""),
+        ),
+    )
     keep = np.zeros(len(rows), dtype=bool)
     claimed_settlements: set[str] = set()
     claimed_invoices: set[str] = set()

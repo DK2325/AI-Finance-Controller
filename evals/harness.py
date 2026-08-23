@@ -9,8 +9,10 @@ from evals.chart import render
 from evals.curve import CURVE_FILE, build_curve
 from evals.metrics import load_batch, score_at
 from evals.models import Run
+from evals.reasons import ReasonScore, score_reasons, settlement_index
 from evals.report import build_report, markdown_table, save_report, write_readme_table
 from evals.runs import FilesystemRunStore, RunStore
+from llm.codes import ReasonCode
 
 REPORT_FILE = "report.json"
 CHART_FILE = "risk-coverage.png"
@@ -30,6 +32,30 @@ def make_baseline_run(batch_dir: Path | str, run_id: str, store: RunStore | None
     return run
 
 
+def _score_reason_codes(run: Run, batch) -> ReasonScore:
+    """Rebuild the candidate sets the run had, and score each code's actionability."""
+    from collections import defaultdict
+
+    from core.candidates import export_candidates
+    from core.exceptions import ExceptionRecord
+
+    pairs: dict[str, set] = defaultdict(set)
+    for row in export_candidates(run.batch_dir):
+        pairs[row.entity_id].add((row.txn_id, row.invoice_id))
+
+    records = [
+        ExceptionRecord(
+            entity_id=e["entity_id"],
+            reason_code=ReasonCode(e["reason_code"]),
+            detail=e.get("detail", ""),
+            txn_id=e.get("txn_id", ""),
+            invoice_id=e.get("invoice_id", ""),
+        )
+        for e in run.exceptions
+    ]
+    return score_reasons(records, pairs, batch, settlement_index(run.batch_dir))
+
+
 def evaluate(
     run_id: str,
     store: RunStore | None = None,
@@ -46,6 +72,27 @@ def evaluate(
     curve = build_curve(run.predictions, batch)
 
     report = build_report(run_id, run.batch_dir, run.predictions, batch, score, curve)
+
+    # Reason-code actionability, when the run recorded its exceptions. Scored against
+    # truth rather than against the model's own tag -- see evals/reasons.py for why
+    # agreement was a mirror and this is not.
+    if run.exceptions:
+        report["reason_codes"] = _score_reason_codes(run, batch).as_dict()
+        report["accounting"] = {
+            "settlements": run.meta.get("n_settlements"),
+            "matched": run.meta.get("n_matched_at_threshold", len(run.predictions)),
+            "exceptions": len(run.exceptions),
+            "accounted_for": (
+                run.meta.get("n_matched_at_threshold", len(run.predictions))
+                + len(run.exceptions)
+            ),
+            "complete": (
+                run.meta.get("n_settlements") is not None
+                and run.meta.get("n_matched_at_threshold", len(run.predictions))
+                + len(run.exceptions)
+                == run.meta["n_settlements"]
+            ),
+        }
 
     out_dir = Path("runs") / run_id
     curve.save(out_dir / CURVE_FILE)

@@ -12,7 +12,7 @@ by one transaction, and the claim goes to the highest calibrated probability.
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -173,6 +173,10 @@ class BatchOutcome:
     matches: list[ScoredCandidate]
     enumeration: EnumerationResult
     threshold: float | None
+    # Every candidate resolution accepted, before the operating point was applied. The
+    # risk-coverage curve is a sweep, so it needs the whole scored distribution; `matches`
+    # is that distribution filtered at one threshold.
+    all_resolved: list[ScoredCandidate] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return {"threshold": self.threshold, **self.enumeration.as_dict()}
@@ -249,7 +253,12 @@ def reconcile_batch(
         calibrated=True,
     )
 
-    return BatchOutcome(matches=matches, enumeration=enumeration, threshold=threshold)
+    return BatchOutcome(
+        matches=matches,
+        enumeration=enumeration,
+        threshold=threshold,
+        all_resolved=accepted,
+    )
 
 
 def audit_records(outcome: BatchOutcome, run_id: str, artifact: Artifact) -> list[AuditRecord]:

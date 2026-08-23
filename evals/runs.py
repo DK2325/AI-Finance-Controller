@@ -15,6 +15,7 @@ from typing import Protocol, runtime_checkable
 from evals.models import Prediction, Run, Triple
 
 PREDICTIONS_FILE = "predictions.jsonl"
+EXCEPTIONS_FILE = "exceptions.jsonl"
 META_FILE = "meta.json"
 
 
@@ -70,8 +71,13 @@ class FilesystemRunStore:
                     + "\n"
                 )
 
+        with (target / EXCEPTIONS_FILE).open("w", newline="", encoding="utf-8") as handle:
+            for record in run.exceptions:
+                handle.write(json.dumps(record, sort_keys=True) + "\n")
+
         meta = dict(run.meta)
         meta["batch_dir"] = run.batch_dir
+        meta["n_exceptions"] = len(run.exceptions)
         meta["run_id"] = run.run_id
         meta["n_predictions"] = len(run.predictions)
         with (target / META_FILE).open("w", newline="", encoding="utf-8") as handle:
@@ -105,11 +111,18 @@ class FilesystemRunStore:
                         )
                     )
 
+        exceptions = []
+        path = target / EXCEPTIONS_FILE
+        if path.is_file():
+            with path.open(encoding="utf-8", newline="") as handle:
+                exceptions = [json.loads(line) for line in handle if line.strip()]
+
         return Run(
             run_id=run_id,
             batch_dir=meta.get("batch_dir", ""),
             predictions=predictions,
             meta=meta,
+            exceptions=exceptions,
         )
 
     def list_runs(self) -> list[str]:
