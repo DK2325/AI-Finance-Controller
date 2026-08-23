@@ -394,3 +394,46 @@ agreement with ourselves.
 **The general shape, which is the reusable part:** a metric that compares two things where
 one was told the other's answer is not measuring agreement, it is measuring transcription.
 Worth checking, for any agreement metric, what the second opinion had access to.
+
+---
+
+## An audit record that contained a false statement
+
+**The most serious defect found in Phase 5, and it would have shipped.**
+
+`NO_CANDIDATE` carries this text, written into every audit record that uses it:
+
+> no bank credit resembled this payout on any blocking pass
+
+It was being applied to settlements for which blocking had produced several candidates.
+The enumeration built its evidence only from candidates a *rule tier had scored*, so a
+settlement that blocking found five credits for and every tier declined arrived at the
+classifier with no evidence row at all — indistinguishable from one blocking never saw.
+On `data/demo`, 15 settlements carried the code and only 8 deserved it.
+
+**Why this is worse than an ordinary bug.** A wrong number in a metric gets checked against
+something eventually. A false sentence in an audit record does not, because the record
+*is* the check. Someone investigating an unmatched payout would read "no bank credit
+resembled this payout", conclude the money never arrived, and go looking at the payment
+gateway — when in fact five credits resembled it and the matcher rejected all five, which
+is a completely different investigation with a completely different fix.
+
+**An audit trail containing a false statement is worse than no audit trail, because it is
+trusted.** No audit trail makes someone go and look. A confident wrong one sends them
+somewhere else.
+
+**The fix.** Evidence is now built from every blocking candidate, with a zero score where
+no rule fired. A settlement with candidates and no rule hit is `LOW_CONFIDENCE` — "scored
+zero on rule tiers", which is true — and `NO_CANDIDATE` now means what it says.
+
+**What let it in.** The invariant tests were passing throughout: every settlement had
+exactly one code, no gaps, no double counts. The invariant checks that *a* code was
+assigned, and cannot check that the *right* one was. Completeness and correctness are
+different properties and the first is much easier to test, which is exactly why it is the
+one that gets tested.
+
+**The general form:** for any generated text that will be read as fact, ask what a reader
+would *do* on the strength of it. `NO_CANDIDATE` and `LOW_CONFIDENCE` send an investigator
+to two different places, so the difference between them is not a labelling nicety — it is
+the entire value of the record. Every reason code's text has been re-read against that
+question.
