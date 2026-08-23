@@ -18,3 +18,19 @@ node_modules/
 # Leading slash anchors this to the repo root -- a bare "runs/" would also match
 # notes/runs/, silently excluding the committed canonical artifacts.
 /runs/
+
+# Two exceptions, because they are deliverables rather than scratch.
+#
+# The hosted demo must come up seeded with a completed run, on a cold boot, with no
+# training and no database write -- "live public URL, seeded with a completed run" is an
+# exit criterion, and a cold start that trains a model is the thing that fails in front of
+# a panel. So the trained artifact and one scored run are versioned. 2.4 MB together.
+!/runs/_models/
+!/runs/_models/**
+!/runs/v1-train/
+!/runs/v1-train/**
+
+# Still ignored: /runs/_datasets/ (regenerable intermediates), /runs/_llm_cache/, and
+# every ad-hoc run.
+/runs/_datasets/
+/runs/_llm_cache/

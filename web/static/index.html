@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LedgerLoop — reconciliation that knows when it is wrong</title>
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <h1>Ledger<span>Loop</span></h1>
+    <p class="tagline">Reconciliation that knows when it is wrong.</p>
+    <div class="badges" id="badges"></div>
+  </div>
+</header>
+
+<main class="wrap" id="app">
+  <p class="loading">Loading run…</p>
+</main>
+
+<template id="explorer-template">
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Choose the operating point</h2>
+      <p class="sub">
+        The system does not choose how much risk you take. You do — and every choice
+        below is one it can actually reach.
+      </p>
+    </div>
+
+    <div class="chosen">
+      <div class="chosen-figure">
+        <span class="big" data-bind="coverage">—</span>
+        <span class="label">auto-matched</span>
+      </div>
+      <div class="chosen-detail">
+        <strong data-bind="matched">—</strong> of <span data-bind="settlements">—</span>
+        settlements matched automatically ·
+        <strong data-bind="to_review">—</strong> go to a human
+      </div>
+    </div>
+
+    <div class="track-wrap">
+      <div class="track" id="track" role="group" aria-label="Operating points"></div>
+      <p class="track-note">
+        <strong>These are the only points that exist.</strong> Tick spacing is the number of
+        settlements each step admits — isotonic calibration produces a step function, so the
+        gaps are real and uneven. A smooth slider would imply a resolution the model does
+        not have.
+      </p>
+    </div>
+
+    <div class="consequences">
+      <article class="cons" data-dir="down">
+        <h3>Review workload</h3>
+        <div class="cons-value" data-bind="to_review_v">—</div>
+        <div class="cons-unit">exceptions for a human</div>
+        <svg class="spark" data-spark="to_review" viewBox="0 0 200 44" preserveAspectRatio="none"></svg>
+        <div class="cons-trend">falls as you automate more</div>
+      </article>
+
+      <article class="cons alarm" data-dir="up">
+        <h3>Wrong money</h3>
+        <div class="cons-value" data-bind="wrong_money_v">—</div>
+        <div class="cons-unit">
+          mis-posted, of <span data-bind="total_money">—</span> at stake
+        </div>
+        <svg class="spark" data-spark="wrong_money_paise" viewBox="0 0 200 44" preserveAspectRatio="none"></svg>
+        <div class="cons-trend">rises as you automate more</div>
+      </article>
+
+      <article class="cons" data-dir="down">
+        <h3>Inference cost</h3>
+        <div class="cons-value" data-bind="cost_v">—</div>
+        <div class="cons-unit">per run, priced as a range</div>
+        <svg class="spark" data-spark="cost_low_inr" viewBox="0 0 200 44" preserveAspectRatio="none"></svg>
+        <div class="cons-trend">falls — fewer exceptions to explain</div>
+      </article>
+    </div>
+
+    <p class="divergence">
+      <strong>They pull against each other.</strong> Automate more and you buy back review
+      time and inference cost — and you pay for it in money posted to the wrong invoice.
+      No single number can express that trade, which is why the merchant makes the call
+      rather than the system.
+    </p>
+
+    <div class="precision">
+      <div class="precision-head">
+        <h3>Precision on what it auto-matched</h3>
+        <div class="precision-value">
+          <span data-bind="precision">—</span>
+          <span class="ci" data-bind="ci">—</span>
+        </div>
+      </div>
+      <div class="precision-bar">
+        <div class="precision-floor" title="99.5% precision floor"></div>
+        <div class="precision-interval" id="ci-bar"></div>
+      </div>
+      <p class="precision-note" data-bind="precision_note">—</p>
+    </div>
+
+    <div class="warn" id="cliff" hidden>
+      <strong>This point is past the floor.</strong>
+      <span data-bind="cliff_text">—</span>
+      It is shown because a slider that stops at the last good point hides the reason the
+      floor exists.
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>What it could not resolve</h2>
+      <p class="sub">
+        Every settlement is accounted for exactly once — matched, or an exception with a
+        reason. <span data-bind="free_share">—</span> of exceptions are explained with no
+        model call at all.
+      </p>
+    </div>
+    <ul class="reasons" id="reasons"></ul>
+  </section>
+</template>
+
+<footer class="wrap foot">
+  <p>
+    <span id="foot-run">—</span> ·
+    <a href="/api/runs" target="_blank" rel="noopener">API</a> ·
+    <a href="/health" target="_blank" rel="noopener">health</a>
+  </p>
+</footer>
+
+<script src="/assets/app.js"></script>
+</body>
+</html>

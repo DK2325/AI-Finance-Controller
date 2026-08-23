@@ -7,4 +7,10 @@ __pycache__/
 .ruff_cache/
 node_modules/
 .env
-data/
+# The image needs the demo batch (one-click run), the training batch (the review screen
+# shows narrations and amounts as evidence), and the seeded run. It does NOT need the
+# sealed test set, which stays out so the seal keeps meaning something.
+data/test/
+notes/
+tests/
+web/server.js

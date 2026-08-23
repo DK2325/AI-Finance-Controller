@@ -1,0 +1,64 @@
+# Single-service image for hosted deployment (Railway).
+#
+# WHY THIS EXISTS ALONGSIDE docker/api.Dockerfile
+#
+# Locally, `docker compose up` is the documented run path and brings up three containers:
+# db, api, web. That stays exactly as it is, because it is what BUILD.md promises and what
+# a reviewer will run.
+#
+# Hosted, one service is cheaper, has one fewer thing that can be down during a demo, and
+# removes a cross-origin hop -- so this image serves the API *and* the static frontend from
+# one process. The two paths are independent, so neither can break the other.
+#
+# WHAT IS BAKED IN, AND WHY
+#
+# The trained model artifact and one scored run are committed to the repository and copied
+# here. A cold start therefore has a completed run to show with no training, no database
+# write, and no network call. "Live public URL, seeded with a completed run" is an exit
+# criterion, and a cold start that trains a model is precisely the thing that fails in
+# front of a panel.
+#
+# data/test is excluded by .dockerignore. It is sealed, and a sealed set that ships inside
+# a public image is a seal that means nothing.
+
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+# Dependencies first, so source edits do not invalidate the pip layer.
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY pyproject.toml alembic.ini ./
+COPY ledgerloop/ ./ledgerloop/
+COPY datagen/ ./datagen/
+COPY core/ ./core/
+COPY model/ ./model/
+COPY llm/ ./llm/
+COPY api/ ./api/
+COPY evals/ ./evals/
+COPY web/static/ ./web/static/
+
+RUN pip install --no-cache-dir -e . --no-deps
+
+# The seed: a trained model and one scored run, both versioned deliverables.
+COPY runs/_models/ ./runs/_models/
+COPY runs/v1-train/ ./runs/v1-train/
+
+# Batches the screens read: the demo batch for the one-click run, and the training batch
+# because the review queue shows narrations and amounts as evidence.
+COPY data/demo/ ./data/demo/
+COPY data/train/ ./data/train/
+
+# Railway assigns $PORT and it is not 8000. Defaulted so the image also runs locally with
+# a bare `docker run`.
+ENV PORT=8000
+EXPOSE 8000
+
+# Shell form on purpose: $PORT must be expanded at runtime, and exec form would pass the
+# literal string to uvicorn.
+CMD uvicorn api.main:app --host 0.0.0.0 --port ${PORT}

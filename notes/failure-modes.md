@@ -620,3 +620,36 @@ they were built to be capable of failing:
 *   **this one**, which needed tied inputs, because ties are the path being tested.
 
 > **A test that cannot fail is documentation with a green tick.**
+
+---
+
+## When a number can be derived or counted, count it
+
+Three instances now, and they are the same mistake wearing different clothes. Each time a
+quantity was computed from another quantity by an argument that was *nearly* right, and the
+gap between nearly and exactly was where the bug lived.
+
+| what was derived | from what | how it was wrong |
+|---|---|---|
+| the deterministic share of exceptions | case-type proportions, reasoned about | **43% estimated, 51.06% counted.** Missed `INVOICE_ALREADY_CLAIMED` entirely, because that code did not exist when the estimate was made |
+| settlements matched at a threshold | the curve's `n_predicted` | `n_predicted` counts **triples**, and several rows of one payout batch produce distinct triples sharing a `settlement_id`. Wrong by a handful of rows |
+| LLM-bound exceptions at a threshold | total exceptions minus a fixed deterministic count | assumed the deterministic codes are threshold-independent. `INVOICE_ALREADY_CLAIMED` is not: it is assigned from a settlement's **best** candidate, and a settlement whose best candidate lost its invoice can still be accepted through its second choice |
+
+Each derivation rested on a claim about how something behaves — which reason codes are
+stable under a threshold, what a count is counting. Claims like that are exactly the ones
+nobody re-examines, because they sound like definitions rather than assertions.
+
+**The rule:** when a number can be derived or counted, count it. Deriving is a claim;
+counting is an observation, and only one of them can be wrong in a way the arithmetic
+hides.
+
+**The related habit that actually fixed the third one:** replace an assumption about
+behaviour with a *structural* fact. Not "deterministic codes do not depend on the
+threshold" — which is almost true and therefore dangerous — but "**a settlement with no
+accepted candidate cannot be matched at any threshold**", which follows from what
+resolution does and needs no claim about codes at all. The first is a generalisation about
+a system; the second is a property of it.
+
+Every one of the three was found by an implausible reading rather than by review: a share
+that jumped 8 points, a cost of ₹0.00, a row count off by five. That is the same
+diagnostic as everywhere else in this file — *is this reading physically possible?*
