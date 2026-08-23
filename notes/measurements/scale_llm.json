@@ -1,0 +1,53 @@
+{
+  "batch": "data/scale",
+  "exceptions_explained": 3347,
+  "wall_seconds": 1025.7,
+  "achieved_rpm": 10.1,
+  "calls_total": 172,
+  "first_attempts": 168,
+  "retries": 4,
+  "stalled_calls": 4,
+  "stall_rate_first_attempt": 0.0238,
+  "truncated_calls": 4,
+  "stalls_surviving_both_attempts": 0,
+  "schema_failure_rate": 0.0,
+  "overall_failure_rate": 0.0012,
+  "by_reason": {
+    "LLM_BATCH_MISMATCH": 4
+  },
+  "usage": {
+    "calls": 172,
+    "cached_calls": 0,
+    "retries": 4,
+    "input_tokens": 731450,
+    "output_tokens": 473935,
+    "billed_tokens": 1205385,
+    "tokens_served_from_cache": 0,
+    "seconds": 7071.53
+  },
+  "cost": {
+    "input_tokens": 731450,
+    "output_tokens": 473935,
+    "low_usd": 0.251747,
+    "high_usd": 0.417775,
+    "low_inr": 22.1538,
+    "high_inr": 36.7642,
+    "spread": 1.66,
+    "basis": "tokens measured on NVIDIA's free hosted endpoint; priced against published third-party rates as of 2026-08-23; not billed",
+    "cheapest_rate": "DeepInfra / OpenRouter",
+    "dearest_rate": "Amazon Bedrock",
+    "usd_to_inr": 88.0
+  },
+  "provenance": {
+    "items": 3343,
+    "items_failed": 0,
+    "item_failure_rate": 0.0,
+    "fields_checked": 0,
+    "fields_absent": 0,
+    "field_failure_rate": 0.0,
+    "failures_by_field": {},
+    "fields_empty": 0,
+    "claim_rate": null,
+    "claim_rate_by_field": {}
+  }
+}
