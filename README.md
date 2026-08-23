@@ -450,7 +450,45 @@ Full analysis and the reasoning trail, including the correction: `notes/injectio
 **Live:** https://ai-finance-controller-production.up.railway.app — seeded with a completed
 run, so it has something to show on a cold start with no training and no database write.
 
-### One deployment finding worth stating
+### Three deployment findings, and why they argue for deploying early
+
+None of the three below was reachable from local testing or from `docker compose`. All
+three were found within an hour of having a real host, and each one would have been found
+in front of a panel instead.
+
+**1. The driver prefix.** Managed Postgres providers inject `DATABASE_URL` as
+`postgresql://…` (Railway, Render) or the legacy `postgres://…`. SQLAlchemy reads that
+scheme as the **driver**, and bare `postgresql://` means psycopg2 — which this project does
+not install; it uses psycopg 3.
+
+> **A perfectly correct injected URL fails to connect, and fails looking like a network
+> problem rather than a driver one.**
+
+Not catchable locally: `DATABASE_URL` is absent on a dev machine and the default already
+names the driver, and `docker compose` sets it explicitly with `+psycopg`. Only a managed
+host injects the bare form.
+
+**2. The empty string.** Railway sets `DATABASE_URL` to `""` when a variable reference does
+not resolve, and `os.environ.get(key, default)` returns that empty string rather than the
+default. Same symptom as (1), different cause.
+
+**3. The missing shared library.** `python:3.12-slim` ships no OpenMP runtime, and LightGBM
+links against it. `pip install lightgbm` succeeds. `import lightgbm` succeeds. Loading a
+model raises `OSError: libgomp.so.1: cannot open shared object file` — so the image built
+green and the failure waited for the one screen that loads a model.
+
+> **A wheel installing is not the same as its shared libraries being present**, and the gap
+> between the two is invisible until something calls into the native layer.
+
+Fixed structurally rather than by adding one package: `api/selfcheck.py` exercises all ten
+native dependencies — *training a two-row model rather than importing LightGBM*, because
+only the first enters the OpenMP runtime — and it runs as a `RUN` step in the Dockerfile.
+A missing shared library now fails the **build**, not a screen. `/health/native` exposes
+the same check on a running container.
+
+*(It caught a bug in itself on first run, which is the behaviour you want from a check.)*
+
+### The original finding, in full
 
 Managed Postgres providers inject `DATABASE_URL` as `postgresql://…` (Railway, Render) or
 the legacy `postgres://…`. SQLAlchemy reads that scheme as the **driver**, and bare

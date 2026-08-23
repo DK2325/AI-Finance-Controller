@@ -294,3 +294,45 @@ def test_an_empty_database_url_falls_back_rather_than_producing_a_broken_one(mon
 
     monkeypatch.setenv("DATABASE_URL", "")
     assert database_url() == DEFAULT_DATABASE_URL
+
+
+def test_every_native_dependency_loads_and_runs() -> None:
+    """A wheel installing is not the same as its shared libraries being present.
+
+    `python:3.12-slim` ships no OpenMP runtime. `pip install lightgbm` succeeded, `import
+    lightgbm` succeeded, and the deployed image built green -- then raised
+    `OSError: libgomp.so.1: cannot open shared object file` on the one screen that loads a
+    model, an hour later.
+
+    So each check *exercises* its dependency rather than importing it: the LightGBM entry
+    trains a two-row model, because only that enters the OpenMP runtime. The same check
+    runs as a RUN step in the Dockerfile, where a missing library fails the build rather
+    than a screen.
+    """
+    from api.selfcheck import check_native
+
+    results = check_native()
+    broken = {k: v for k, v in results.items() if v != "ok"}
+    assert not broken, f"native dependencies that do not work here: {broken}"
+
+
+def test_the_native_check_exercises_rather_than_imports() -> None:
+    """If a check were a bare import it would pass on an image missing the library, which
+    is the exact failure this exists to prevent."""
+    from api.selfcheck import NATIVE_CHECKS
+
+    snippets = dict(NATIVE_CHECKS)
+    assert "lgb.train" in snippets["lightgbm"], "importing lightgbm does not need libgomp"
+    assert ".fit(" in snippets["sklearn"]
+    for name, snippet in NATIVE_CHECKS:
+        if name == "psycopg":
+            continue  # a driver import is the whole surface here
+        assert snippet.count(";") >= 1 or "(" in snippet, f"{name} is only an import"
+
+
+def test_the_native_health_endpoint_reports_each_dependency() -> None:
+    body = client.get("/health/native").json()
+    assert body["ok"] is True
+    assert body["checked"] >= 8
+    assert body["broken"] == {}
+    assert body["results"]["lightgbm"] == "ok"

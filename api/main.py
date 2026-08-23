@@ -26,6 +26,7 @@ from sqlalchemy import text
 
 from api.jobs import REGISTRY, Job
 from api.review import ACTIONS, decisions_for, evidence_for, record_decision
+from api.selfcheck import check_native
 from api.service import dashboard, list_runs, load_run
 from ledgerloop import __version__
 from ledgerloop.config import llm_available, nvidia_model
@@ -36,6 +37,20 @@ DEMO_BATCH = "data/demo"
 DEMO_MODEL = "runs/_models/v1"
 
 app = FastAPI(title="LedgerLoop", version=__version__)
+
+
+@app.get("/health/native")
+def health_native() -> dict:
+    """Which native dependencies actually load and run in this container.
+
+    Separate from /health because it is not free -- it trains a two-row model to enter the
+    OpenMP runtime, which is the only way to distinguish "lightgbm imported" from
+    "lightgbm can do arithmetic". Kept so a deployed container can be interrogated without
+    shelling into it.
+    """
+    results = check_native()
+    broken = {k: v for k, v in results.items() if v != "ok"}
+    return {"ok": not broken, "checked": len(results), "broken": broken, "results": results}
 
 
 @app.get("/health")

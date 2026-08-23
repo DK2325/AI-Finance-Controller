@@ -29,6 +29,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Native runtimes the wheels link against but do not carry.
+#
+# python:3.12-slim ships no OpenMP runtime. `pip install lightgbm` succeeds, `import
+# lightgbm` succeeds, and the failure arrives only when a model is loaded:
+#
+#     OSError: libgomp.so.1: cannot open shared object file
+#
+# Found on the deployed host, on the one screen that loads a model, an hour after this
+# image first built green. Nothing local could catch it -- a developer machine has libgomp,
+# and so does every base image that is not slim.
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Dependencies first, so source edits do not invalidate the pip layer.
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
@@ -44,6 +58,11 @@ COPY evals/ ./evals/
 COPY web/static/ ./web/static/
 
 RUN pip install --no-cache-dir -e . --no-deps
+
+# Prove every native dependency LOADS AND RUNS, not merely that its wheel installed.
+# A missing shared library now fails the build rather than a screen, which is the point:
+# the same principle as every other guard here -- structurally impossible, not promised.
+RUN python -m api.selfcheck
 
 # The seed: a trained model and one scored run, both versioned deliverables.
 COPY runs/_models/ ./runs/_models/
