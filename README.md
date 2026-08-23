@@ -148,9 +148,14 @@ provider without `json_schema` makes that path load-bearing immediately.
 generative work a rule can settle — architecture rule 1 forbids it. The reduced inference
 bill is a consequence of that rule, not a reason for it.
 
-> The share was estimated at 43% from a probe before the exception objects existed in
-> code. It is re-measured against the real enumeration in Phase 5 and this line carries
-> the measured figure once it does.
+**Measured on `data/train`: 51.06%** of exceptions — 1,250 of 2,448 — carry a
+deterministic reason code and never reach a model. `NO_CANDIDATE` (296), `NO_INVOICE_LINK`
+(852) and `INVOICE_ALREADY_CLAIMED` (102).
+
+*(An earlier estimate of 43% came from reasoning about case-type proportions rather than
+counting exception objects, which did not exist in code at the time. It missed
+`INVOICE_ALREADY_CLAIMED` entirely — a structural refusal nobody enumerates in the
+abstract. See `notes/failure-modes.md`, "Proxies drift from the thing they proxy".)*
 
 ### The schema is a constraint, not a request
 
@@ -237,6 +242,55 @@ all that is left.
 So the layer ordering is not a policy we imposed on the architecture. **The gate we built
 to check the model turned out to describe the boundary**, and the model's job is the
 complement of what the gate can generate.
+
+### What that was worth, measured
+
+Same 100 real narrations, before and after applying the test:
+
+| | wall time | tokens |
+|---|---|---|
+| parse schema with identifiers and payment method | 280s | 31,956 |
+| parse schema after three fields failed the test | 102s | 12,073 |
+
+**A 2.7× speedup and 62% fewer tokens, entirely from deleting fields rather than tuning
+anything.** No prompt engineering, no model change, no batching adjustment — three fields
+removed because a regex could produce them, and the accuracy on those fields went *up*,
+from the model's 68% to a regex's 100%.
+
+That is the measurable form of the same argument. Work given to the wrong layer is not
+merely more expensive; it is more expensive *and* worse.
+
+## The audit trail names where the evidence ran out
+
+Every settlement produces exactly one audit record, matched or not. Declining to match is
+a decision, and if only matches were recorded the trail would explain every rupee that
+moved and nothing about the rupees that did not — which is the half an auditor asks about.
+
+**The `layer` on a record is where the evidence ran out, not where we noticed.** A
+settlement that blocking never produced a candidate for is filed under `blocking`, even
+though the model layer is what enumerated it. Filing it under `model` would be true in a
+narrow sense and useless: it would point an investigation at the classifier when the
+problem is upstream of it.
+
+```
+data/train, 4,945 settlements, 4,945 audit records
+
+  model / matched            2,497
+  model / exception          1,300     abstained, or two candidates too close
+  blocking / exception         296     no candidate ever existed
+  invoice_link / exception     852     a credit fits, no invoice can be named
+```
+
+That is what makes the trail an investigation tool rather than a log. The three exception
+layers are three different problems with three different fixes, and a single `layer:
+model` on all of them would hide that.
+
+**One record shape across every layer.** A deterministic decision and a model decision are
+indistinguishable in structure and distinguishable only by content — a rules decision
+carries `prompt_version: null` and `input_tokens: 0`, and zero is a measurement rather than
+a missing value. The alternative, a narrow row for cheap layers and a wide one for
+expensive ones, means every cross-layer query grows a branch, and the first query nobody
+writes is the one that would have found the problem.
 
 ## Untrusted input, and what actually defends against it
 

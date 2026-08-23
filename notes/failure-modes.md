@@ -315,3 +315,42 @@ costs — a batch of 20 at ~120 tokens each needs ~2,400, not the 5,000 currentl
 That is a reasonable safety net and it is deliberately not being adopted as *the fix*,
 because it treats the cost of the symptom and would let the cause go uninvestigated. It
 remains available if the Phase 7 rate is bad.
+
+---
+
+## Proxies drift from the thing they proxy
+
+Three times now, a probe and a real measurement have disagreed. That is no longer a run of
+bad luck; it is a pattern with a cause, and the cause is worth naming because the fix is
+always the same and is always available earlier than it was taken.
+
+| what was estimated | how | estimate | measured | gap |
+|---|---|---|---|---|
+| exceptions reachable without an LLM | proportions from a probe over case types | **43%** | **51.06%** | +8 points |
+| schema failure rate under batching | 50 single calls | 0.0% | 20% of batches, then 0% after a schema change | qualitative |
+| run time for a 25,000-row batch | 36 rpm assumed saturated | 8.7 min | 11 min measured, 101 min as actually built | 12x |
+
+**The 43% is the clearest case.** It came from taking the case-type distribution and
+reasoning about which types would produce which reason codes. It was wrong for a reason
+that could not have been spotted from inside the estimate: two of the deterministic codes
+did not exist yet. `INVOICE_ALREADY_CLAIMED` accounts for 102 of the 2,448 exceptions on
+`data/train` and was invented only when the enumeration was built, because it is a
+structural refusal — an invoice is paid once — that nobody thinks to enumerate in the
+abstract. Without it the share would have been 46.9%; the rest of the gap is the
+difference between reasoning about proportions and counting objects.
+
+**The general form.** A proxy is a model of the thing, and a model omits whatever its
+author did not think of. That is precisely the class of error a proxy cannot reveal,
+because the omission is invisible from inside it. Constructing the object is not a more
+careful version of estimating — it is a different operation, and it is the only one that
+can surface a category nobody had in mind.
+
+**The rule this build now follows:** when a number is load-bearing, build the object it
+counts before designing against it. The 43% drove the batch size, the rate limiter and the
+run-time claim, and all three were designed against a figure that had never existed as a
+set of rows.
+
+**Direction matters, though it does not excuse the method.** All three estimates were wrong
+in the safe direction — fewer exceptions reach the model than designed for, and the run is
+slower than claimed rather than faster. Being over-provisioned is the right way to be
+wrong. It is still being wrong, and the next proxy has no obligation to fail politely.
