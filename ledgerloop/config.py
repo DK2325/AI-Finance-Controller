@@ -38,6 +38,24 @@ def nvidia_model() -> str:
     return os.environ.get("NVIDIA_MODEL") or DEFAULT_NVIDIA_MODEL
 
 
+DEFAULT_LLM_PROVIDER = "nvidia"
+
+
+def llm_provider_name() -> str:
+    """Which provider to build, before the --mock-llm flag gets its say.
+
+    Defaults to the mock when no key is present rather than raising, so every phase
+    before this one keeps running on a machine that has never seen a credential. An
+    explicit LLM_PROVIDER always wins over the default, including LLM_PROVIDER=mock on a
+    machine that does have a key -- being able to force the mock is what makes a NIM
+    outage a config change instead of a crisis.
+    """
+    explicit = os.environ.get("LLM_PROVIDER", "").strip().lower()
+    if explicit:
+        return explicit
+    return DEFAULT_LLM_PROVIDER if nvidia_api_key() else "mock"
+
+
 def llm_available() -> bool:
     """Whether a real LLM call is possible. Never prints or returns the key itself."""
     return nvidia_api_key() is not None
