@@ -41,6 +41,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -70,6 +71,15 @@ MIN_PARSE_CONFIDENCE = 0.35
 # integer in the row", because a row also carries counts and day-gaps, and admitting those
 # as known amounts would let a two-paise figure verify against `n_close: 2`.
 AMOUNT_KEY_MARKERS = ("amount", "credit", "debit", "fee", "tax", "paise", "difference")
+
+# Batches in flight. Under the ceiling on purpose, not at it.
+#
+# 36 rpm with ~20s calls is saturated by about twelve concurrent requests. Running at
+# exactly that leaves nothing for the retries -- which draw on the same bucket -- or for
+# a latency spike, and the failure mode of guessing high is 429s, which cost a round
+# trip AND a backoff. Eight is deliberately short of the arithmetic; the rate actually
+# achieved is reported by JobResult.achieved_rpm rather than assumed from this number.
+DEFAULT_CONCURRENCY = 8
 
 
 @dataclass
@@ -174,6 +184,18 @@ class JobResult:
     prompt_version: str = ""
     batches: int = 0
     unexpected_ids: list[str] = field(default_factory=list)
+    wall_seconds: float = 0.0
+
+    @property
+    def achieved_rpm(self) -> float:
+        """Requests per minute actually reached, retries included.
+
+        The measured number, not the theoretical one. Retries compete for the same
+        token bucket as first attempts, so a run with a high stall rate achieves less
+        than the pool size suggests -- and that gap is exactly what a capacity estimate
+        needs to account for."""
+        total = self.usage.calls + self.usage.cached_calls
+        return round(total / (self.wall_seconds / 60), 1) if self.wall_seconds else 0.0
 
     @property
     def succeeded(self) -> list[ItemOutcome]:
@@ -225,6 +247,8 @@ class JobResult:
             "schema_failure_rate": round(self.schema_failure_rate, 5),
             "by_reason": self.by_reason(),
             "unexpected_ids": self.unexpected_ids,
+            "wall_seconds": self.wall_seconds,
+            "achieved_rpm": self.achieved_rpm,
             "usage": self.usage.as_dict(),
             "provenance": self.provenance.as_dict(),
         }
@@ -318,22 +342,44 @@ def _decode(response: LLMResponse, model_cls: type) -> tuple[Any | None, ReasonC
         return None, ReasonCode.LLM_SCHEMA_INVALID, f"{location}: {first['msg']}"[:160]
 
 
+@dataclass
+class _BatchResult:
+    """Everything one batch produced, returned rather than written into shared state.
+
+    Under concurrency this is what keeps the run deterministic. Workers touch nothing
+    outside their own batch; the caller merges these in *input order*, so token totals,
+    the call log and the provenance statistics come out identical regardless of which
+    batch happened to finish first.
+    """
+
+    outcomes: list[ItemOutcome] = field(default_factory=list)
+    usage: Usage = field(default_factory=Usage)
+    provenance: list[ProvenanceResult] = field(default_factory=list)
+    unexpected_ids: list[str] = field(default_factory=list)
+
+
 def _run_batch(
     prompt: Prompt,
     items: Sequence[Mapping],
     provider: LLMProvider,
     cache: ResponseCache | None,
-    result: JobResult,
-) -> list[ItemOutcome]:
+) -> _BatchResult:
+    result = _BatchResult()
     request = prompt.request(items)
     model_cls = schema_for(prompt.schema_name)
 
     try:
         response = _call(provider, request, cache, result.usage)
     except RateLimited as exc:
-        return _fail_batch(items, ReasonCode.LLM_RATE_LIMITED, str(exc)[:160], request)
+        result.outcomes = _fail_batch(
+            items, ReasonCode.LLM_RATE_LIMITED, str(exc)[:160], request
+        )
+        return result
     except TransportFailed as exc:
-        return _fail_batch(items, ReasonCode.LLM_TRANSPORT_FAILED, str(exc)[:160], request)
+        result.outcomes = _fail_batch(
+            items, ReasonCode.LLM_TRANSPORT_FAILED, str(exc)[:160], request
+        )
+        return result
 
     parsed, code, detail = _decode(response, model_cls)
 
@@ -343,17 +389,20 @@ def _run_batch(
         try:
             response = _call(provider, request, cache, result.usage, retry=True)
         except RateLimited as exc:
-            return _fail_batch(
+            result.outcomes = _fail_batch(
                 items, ReasonCode.LLM_RATE_LIMITED, str(exc)[:160], request, response
             )
+            return result
         except TransportFailed as exc:
-            return _fail_batch(
+            result.outcomes = _fail_batch(
                 items, ReasonCode.LLM_TRANSPORT_FAILED, str(exc)[:160], request, response
             )
+            return result
         parsed, code, detail = _decode(response, model_cls)
 
     if parsed is None:
-        return _fail_batch(items, code, detail, request, response)
+        result.outcomes = _fail_batch(items, code, detail, request, response)
+        return result
 
     if cache is not None:
         cache.put(request, response)
@@ -399,7 +448,7 @@ def _run_batch(
         fields = entry.model_dump()
 
         checked = verify(fields, _source_for(item))
-        result.provenance.record(checked)
+        result.provenance.append(checked)
         outcome.provenance = checked
 
         if not checked.passed:
@@ -418,7 +467,27 @@ def _run_batch(
         outcome.fields = checked.cleaned()
         outcomes.append(outcome)
 
-    return outcomes
+    result.outcomes = outcomes
+    return result
+
+
+def _merge(result: JobResult, batch: _BatchResult) -> None:
+    """Fold one batch into the run, in the caller's thread and in input order."""
+    result.outcomes.extend(batch.outcomes)
+    result.unexpected_ids.extend(batch.unexpected_ids)
+    for checked in batch.provenance:
+        result.provenance.record(checked)
+
+    usage = result.usage
+    usage.calls += batch.usage.calls
+    usage.cached_calls += batch.usage.cached_calls
+    usage.retries += batch.usage.retries
+    usage.input_tokens += batch.usage.input_tokens
+    usage.output_tokens += batch.usage.output_tokens
+    usage.cached_input_tokens += batch.usage.cached_input_tokens
+    usage.cached_output_tokens += batch.usage.cached_output_tokens
+    usage.seconds += batch.usage.seconds
+    usage.call_log.extend(batch.usage.call_log)
 
 
 def run_job(
@@ -428,6 +497,7 @@ def run_job(
     cache: ResponseCache | None = None,
     mock: bool = False,
     version: int | None = None,
+    concurrency: int = DEFAULT_CONCURRENCY,
 ) -> JobResult:
     """Run one LLM job over every row, batched at the prompt's declared size.
 
@@ -435,15 +505,50 @@ def run_job(
     an unverifiable one, comes back with a reason code rather than being absent -- the
     caller must be able to account for every settlement, and silently dropping rows is how
     a coverage number starts flattering itself.
+
+    CONCURRENCY WITHOUT LOSING DETERMINISM
+
+    Batches run in a bounded pool because sequential calls cannot use the rate limit we
+    are allowed: at ~20s a call, one at a time is 3 rpm against a 36 rpm ceiling, and a
+    25,000-row run takes 101 minutes instead of nine.
+
+    Two properties are preserved, and both are asserted in tests:
+
+    *   **Order.** `executor.map` yields in submission order, so outcomes reassemble in
+        input order however completion interleaved.
+    *   **Reproducibility.** Workers mutate nothing shared -- each returns a `_BatchResult`
+        and the caller folds it in. Token totals, the call log and the provenance
+        statistics are therefore accumulated in batch order, not in finish order, so two
+        runs of the same input produce byte-identical reports.
+
+    The pool is deliberately smaller than the arithmetic allows. Saturating 36 rpm at 20s
+    latency needs ~12 in flight; the default is 8, which leaves room for retries -- which
+    compete for the same bucket -- and for a latency spike, without either turning into
+    429s. What the run actually achieves is measured rather than assumed: see
+    `JobResult.achieved_rpm`.
     """
     prompt = load(job, version=version)
     if provider is None:
         provider = get_provider(mock=mock).provider
 
     result = JobResult(job=job, prompt_version=prompt.version_id)
+    batches = prompt.batches(list(items))
+    result.batches = len(batches)
+    if not batches:
+        return result
 
-    for batch in prompt.batches(list(items)):
-        result.batches += 1
-        result.outcomes.extend(_run_batch(prompt, batch, provider, cache, result))
+    started = time.perf_counter()
 
+    if concurrency <= 1 or len(batches) == 1:
+        for batch in batches:
+            _merge(result, _run_batch(prompt, batch, provider, cache))
+    else:
+        with ThreadPoolExecutor(max_workers=min(concurrency, len(batches))) as pool:
+            # map preserves submission order regardless of completion order.
+            for outcome in pool.map(
+                lambda b: _run_batch(prompt, b, provider, cache), batches
+            ):
+                _merge(result, outcome)
+
+    result.wall_seconds = round(time.perf_counter() - started, 3)
     return result

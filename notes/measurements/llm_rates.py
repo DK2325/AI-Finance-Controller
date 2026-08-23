@@ -19,7 +19,7 @@ missing tokens, so a human can judge the distinction that matters:
 
 Those need different remedies, and an aggregate rate cannot tell them apart.
 
-    python notes/measurements/llm_rates.py [n]
+    python notes/measurements/llm_rates.py [n] [concurrency]
 """
 
 import csv
@@ -65,6 +65,7 @@ def pick_narrations(n: int) -> list[dict]:
 
 def main() -> None:
     n = int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_N
+    concurrency = int(sys.argv[2]) if len(sys.argv) > 2 else 8
 
     choice = get_provider()
     if choice.provider.name != "nvidia":
@@ -79,7 +80,10 @@ def main() -> None:
 
     started = time.perf_counter()
     # Cache off: a measurement served from cache measures the cache.
-    result = run_job("parse", rows, provider=choice.provider, cache=ResponseCache(enabled=False))
+    result = run_job(
+        "parse", rows, provider=choice.provider,
+        cache=ResponseCache(enabled=False), concurrency=concurrency,
+    )
     wall = time.perf_counter() - started
 
     # ---- verdict counts per field, across every check that was made ----------
@@ -111,6 +115,8 @@ def main() -> None:
         "n": len(rows),
         "wall_seconds": round(wall, 1),
         "batches": result.batches,
+        "concurrency": concurrency,
+        "achieved_rpm": result.achieved_rpm,
         "schema_failure_rate": round(result.schema_failure_rate, 5),
         "overall_failure_rate": round(result.failure_rate, 5),
         "by_reason": result.by_reason(),

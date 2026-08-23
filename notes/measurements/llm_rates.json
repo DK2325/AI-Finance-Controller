@@ -1,102 +1,158 @@
 {
   "model": "nvidia/nemotron-3-super-120b-a12b",
-  "n": 100,
-  "wall_seconds": 101.6,
-  "batches": 5,
+  "n": 199,
+  "wall_seconds": 22.1,
+  "batches": 10,
+  "concurrency": 8,
+  "achieved_rpm": 27.2,
   "schema_failure_rate": 0.0,
-  "overall_failure_rate": 0.02,
+  "overall_failure_rate": 0.0201,
   "by_reason": {
-    "LOW_PARSE_CONFIDENCE": 2
+    "LOW_PARSE_CONFIDENCE": 4
   },
   "provenance": {
-    "items": 100,
+    "items": 199,
     "items_failed": 0,
     "item_failure_rate": 0.0,
-    "fields_checked": 98,
+    "fields_checked": 199,
     "fields_absent": 0,
     "field_failure_rate": 0.0,
     "failures_by_field": {},
-    "fields_empty": 2,
-    "claim_rate": 0.98,
+    "fields_empty": 0,
+    "claim_rate": 1.0,
     "claim_rate_by_field": {
-      "counterparty_name": 0.98
+      "counterparty_name": 1.0
     }
   },
   "provenance_by_field": {
     "counterparty_name": {
-      "empty": 2,
-      "present": 98
+      "present": 199
     }
   },
   "usage": {
-    "calls": 5,
+    "calls": 10,
     "cached_calls": 0,
     "retries": 0,
-    "input_tokens": 7619,
-    "output_tokens": 4454,
-    "billed_tokens": 12073,
+    "input_tokens": 14953,
+    "output_tokens": 8538,
+    "billed_tokens": 23491,
     "tokens_served_from_cache": 0,
-    "seconds": 101.55
+    "seconds": 69.75
   },
   "call_log": [
     {
-      "seconds": 33.07,
+      "seconds": 6.25,
       "input_tokens": 1635,
-      "output_tokens": 996,
+      "output_tokens": 939,
       "truncated": false,
       "stalled": false,
-      "raw_chars": 2475,
+      "raw_chars": 2636,
       "retry": false
     },
     {
-      "seconds": 11.24,
-      "input_tokens": 1547,
-      "output_tokens": 853,
+      "seconds": 3.87,
+      "input_tokens": 1548,
+      "output_tokens": 855,
       "truncated": false,
       "stalled": false,
       "raw_chars": 2334,
       "retry": false
     },
     {
-      "seconds": 12.13,
-      "input_tokens": 1533,
-      "output_tokens": 903,
+      "seconds": 10.03,
+      "input_tokens": 1532,
+      "output_tokens": 902,
       "truncated": false,
       "stalled": false,
       "raw_chars": 2409,
       "retry": false
     },
     {
-      "seconds": 29.75,
-      "input_tokens": 1481,
-      "output_tokens": 862,
+      "seconds": 7.11,
+      "input_tokens": 1547,
+      "output_tokens": 879,
       "truncated": false,
       "stalled": false,
-      "raw_chars": 2393,
+      "raw_chars": 2397,
       "retry": false
     },
     {
-      "seconds": 15.35,
-      "input_tokens": 1423,
-      "output_tokens": 840,
+      "seconds": 8.3,
+      "input_tokens": 1599,
+      "output_tokens": 897,
       "truncated": false,
       "stalled": false,
-      "raw_chars": 2391,
+      "raw_chars": 2464,
+      "retry": false
+    },
+    {
+      "seconds": 6.13,
+      "input_tokens": 1465,
+      "output_tokens": 899,
+      "truncated": false,
+      "stalled": false,
+      "raw_chars": 2482,
+      "retry": false
+    },
+    {
+      "seconds": 9.36,
+      "input_tokens": 1407,
+      "output_tokens": 828,
+      "truncated": false,
+      "stalled": false,
+      "raw_chars": 2313,
+      "retry": false
+    },
+    {
+      "seconds": 5.21,
+      "input_tokens": 1424,
+      "output_tokens": 728,
+      "truncated": false,
+      "stalled": false,
+      "raw_chars": 1825,
+      "retry": false
+    },
+    {
+      "seconds": 6.43,
+      "input_tokens": 1463,
+      "output_tokens": 829,
+      "truncated": false,
+      "stalled": false,
+      "raw_chars": 2372,
+      "retry": false
+    },
+    {
+      "seconds": 7.08,
+      "input_tokens": 1333,
+      "output_tokens": 782,
+      "truncated": false,
+      "stalled": false,
+      "raw_chars": 2196,
       "retry": false
     }
   ],
   "failure_details": [
     {
-      "id": "EX0070",
+      "id": "EX0166",
       "code": "LOW_PARSE_CONFIDENCE",
       "detail": "parse_confidence 0.0 below floor 0.35"
     },
     {
-      "id": "EX0071",
+      "id": "EX0170",
+      "code": "LOW_PARSE_CONFIDENCE",
+      "detail": "parse_confidence 0.0 below floor 0.35"
+    },
+    {
+      "id": "EX0171",
+      "code": "LOW_PARSE_CONFIDENCE",
+      "detail": "parse_confidence 0.0 below floor 0.35"
+    },
+    {
+      "id": "EX0172",
       "code": "LOW_PARSE_CONFIDENCE",
       "detail": "parse_confidence 0.0 below floor 0.35"
     }
   ],
-  "tokens_per_item": 120.7,
+  "tokens_per_item": 118.0,
   "counterparty_failures_sample": []
 }

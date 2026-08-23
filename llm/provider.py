@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -253,9 +254,13 @@ class MockProvider:
         self.fault = fault
         self.model = model
         self.calls = 0
+        # The handler runs batches in a pool, so the counter tests assert on is
+        # incremented from several threads.
+        self._lock = threading.Lock()
 
     def complete(self, request: LLMRequest) -> LLMResponse:
-        self.calls += 1
+        with self._lock:
+            self.calls += 1
 
         if self.fault is Fault.RATE_LIMITED:
             raise RateLimited("mock: 429 after backoff")

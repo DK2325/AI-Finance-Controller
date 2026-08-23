@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -91,6 +92,9 @@ class ResponseCache:
         self.directory = Path(directory)
         self.enabled = enabled
         self.stats = CacheStats()
+        # Batches run concurrently. File writes are already atomic via write-then-rename;
+        # this guards the counters, which are reported and so must be exact.
+        self._lock = threading.Lock()
 
     def _path(self, key: str) -> Path:
         # Two-character shard, so no single directory holds every entry.
@@ -102,17 +106,20 @@ class ResponseCache:
 
         path = self._path(cache_key(request, model))
         if not path.is_file():
-            self.stats.misses += 1
+            with self._lock:
+                self.stats.misses += 1
             return None
 
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             # A truncated entry is a miss, not a crash. The call simply runs again.
-            self.stats.misses += 1
+            with self._lock:
+                self.stats.misses += 1
             return None
 
-        self.stats.hits += 1
+        with self._lock:
+            self.stats.hits += 1
         return LLMResponse(
             text=payload["text"],
             model=payload["model"],
@@ -151,4 +158,5 @@ class ResponseCache:
             json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n"
         )
         temporary.replace(path)
-        self.stats.writes += 1
+        with self._lock:
+            self.stats.writes += 1

@@ -9,6 +9,8 @@ itself.
 from __future__ import annotations
 
 import json
+import threading
+import time
 
 import pytest
 
@@ -338,3 +340,101 @@ def test_an_honest_overrun_is_not_reported_as_a_stall() -> None:
         model="m", provider="p", output_tokens=8000,
     )
     assert not response.stalled
+
+
+# ------------------------------------------------------------- concurrency
+
+
+class _ReverseLatency(MockProvider):
+    """Finishes batches in the opposite order to submission.
+
+    A pool that reassembled results by completion order would produce exactly reversed
+    output against this, which is the point: the ordering test has to be able to fail.
+    """
+
+    def __init__(self, n_batches: int) -> None:
+        super().__init__()
+        self.n = n_batches
+        self._seen: dict[str, int] = {}
+        self._lock = threading.Lock()
+
+    def complete(self, request):
+        with self._lock:
+            index = self._seen.setdefault(request.user, len(self._seen))
+        time.sleep(0.02 * (self.n - index))
+        return super().complete(request)
+
+
+def wide_rows(n: int = 60) -> list[dict]:
+    return [
+        {"id": f"EX{i:04d}", "narration": f"NEFT-CR-HDFC0000123-ACME {i} LIMITED-3000000044{i:02d}"}
+        for i in range(n)
+    ]
+
+
+def test_outcomes_come_back_in_input_order_however_calls_finish() -> None:
+    rows = wide_rows()
+    result = run_job("parse", rows, provider=_ReverseLatency(3), concurrency=4)
+    assert [o.item_id for o in result.outcomes] == [r["id"] for r in rows]
+
+
+def test_concurrency_does_not_change_the_result() -> None:
+    """Same input, same output, whatever the pool size. Otherwise the number a run reports
+    depends on how busy the machine was."""
+    rows = wide_rows()
+    serial = run_job("parse", rows, provider=MockProvider(), concurrency=1)
+    parallel = run_job("parse", rows, provider=MockProvider(), concurrency=8)
+
+    assert [o.item_id for o in serial.outcomes] == [o.item_id for o in parallel.outcomes]
+    assert [o.fields for o in serial.outcomes] == [o.fields for o in parallel.outcomes]
+    assert serial.usage.billed_tokens == parallel.usage.billed_tokens
+    assert serial.usage.call_log == parallel.usage.call_log
+    assert serial.provenance.as_dict() == parallel.provenance.as_dict()
+
+
+def test_two_concurrent_runs_report_identically() -> None:
+    """Reproducibility, not just order. Statistics are folded in batch order rather than
+    finish order, so nothing depends on the interleaving."""
+    rows = wide_rows()
+    first = run_job("parse", rows, provider=_ReverseLatency(3), concurrency=4)
+    second = run_job("parse", rows, provider=_ReverseLatency(3), concurrency=4)
+
+    def strip(report: dict) -> dict:
+        return {k: v for k, v in report.items() if k not in ("wall_seconds", "achieved_rpm")}
+
+    assert strip(first.as_dict()) == strip(second.as_dict())
+
+
+def test_a_failing_batch_does_not_take_the_others_with_it() -> None:
+    """One bad batch must produce reason codes for its own rows and nothing else's."""
+
+    class _OneBadBatch(MockProvider):
+        def __init__(self) -> None:
+            super().__init__()
+            self._seen: set[str] = set()
+            self._lock = threading.Lock()
+
+        def complete(self, request):
+            with self._lock:
+                first = request.user not in self._seen
+                self._seen.add(request.user)
+            self.fault = Fault.MALFORMED if first and len(self._seen) == 1 else Fault.NONE
+            return super().complete(request)
+
+    result = run_job("parse", wide_rows(), provider=_OneBadBatch(), concurrency=4)
+    assert len(result.outcomes) == 60
+    assert len(result.failed) <= 20, "a failure spread beyond its own batch"
+
+
+def test_the_achieved_rate_is_measured_not_assumed() -> None:
+    """Retries draw on the same bucket as first attempts, so the rate a pool size implies
+    is an upper bound rather than a prediction."""
+    result = run_job("parse", wide_rows(), provider=MockProvider(), concurrency=4)
+    assert result.wall_seconds > 0
+    assert result.achieved_rpm > 0
+    assert result.as_dict()["achieved_rpm"] == result.achieved_rpm
+
+
+def test_a_single_batch_does_not_start_a_pool() -> None:
+    result = run_job("parse", ROWS, provider=MockProvider(), concurrency=8)
+    assert result.batches == 1 and len(result.outcomes) == len(ROWS)
