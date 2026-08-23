@@ -237,7 +237,13 @@ Three things a reader should carry away with the headline:
 3. **Calibration out of sample is intact where the system operates** and degrades only on
    the unseen types, by a measured 1.6 thousandths of ECE overall.
 
-The README currently states 51.31% coverage at 99.5050% precision as the documented figure
-and 68.16% as measured-but-unconfirmed. Both are now superseded by 62.91% at 99.9037% on
-held-out data, and the README has not been rewritten in this commit — the numbers land
-first, the prose that quotes them follows, so that the two are separable in history.
+The README stated 51.31% coverage at 99.5050% as the documented figure and 68.16% as
+measured-but-unconfirmed. Both are superseded by 62.91% at 99.9037% on held-out data. The
+README was rewritten in a later commit rather than this one — the numbers land first and
+the prose that quotes them follows, so the two are separable in history.
+
+**One inconsistency this exposed, recorded here because it is not a documentation problem.**
+The deployed instance is seeded from `runs/v1-train/`, a run scored at threshold
+**0.998921** — the operating point the pre-commitment rejected. No prose on the site quotes
+a superseded number, but the site *renders* one: 50.50% coverage at 99.96% on `data/train`.
+Re-seeding is a deployment change and is not made as part of reporting the test set.

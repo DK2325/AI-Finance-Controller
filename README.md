@@ -416,6 +416,43 @@ candidate, a shifted reason-code mix, is ruled out in
 > rates as of 23 August 2026; not billed.* Sources and dates in
 > [notes/pricing.md](notes/pricing.md).
 
+### Unit economics
+
+**Measured, per 1,000 settlements:**
+
+| | sealed test set | `data/scale` (24,750 rows) |
+|---|---|---|
+| settlements an analyst must still review | **370.9** | 391.1 |
+| settlements removed from review | **629.1** | 608.9 |
+| inference cost | **₹0.68 – ₹1.14** | ₹0.90 – ₹1.49 |
+
+Two inputs are needed to turn that into hours and rupees, and **neither is a property of
+this system**: `N`, the settlements an analyst reconciles per hour by hand, and `X`, their
+fully-loaded hourly cost. They belong to a merchant's finance team, so they are named rather
+than assumed:
+
+```
+hours removed per 1,000 settlements  =  629.1 / N
+value of those hours                 =  (629.1 / N) × X
+against inference                    =  ₹0.68 – ₹1.14 per 1,000
+```
+
+A sensitivity grid over plausible `N` and `X`, and the arithmetic behind it, is in
+[notes/measurements/review_load.json](notes/measurements/review_load.json). Across every
+combination in that grid the analyst time removed is worth **three to four orders of
+magnitude more than the inference that removed it**, which is the shape of the result
+rather than a claim about any particular merchant's numbers.
+
+**Three things that qualify it, and are measured:**
+
+- **Removed from review is not the same as removed from risk.** 3 of the 3,114 auto-matched
+  rows were wrong, carrying ₹671,820 of misposted money. A merchant accepting the
+  auto-matched set accepts that.
+- **The exception queue is not uniform work.** `AMBIGUOUS_CANDIDATES` is 26.7% actionable,
+  so a share of the 370.9 reviewed rows costs an analyst time and yields nothing.
+- **At production volume, precision is 99.2369%, below the floor.** Any value claimed at
+  24,750 settlements inherits that number, not the sealed 99.9037%.
+
 ## The audit trail names where the evidence ran out
 
 Every settlement produces exactly one audit record, matched or not. Declining to match is

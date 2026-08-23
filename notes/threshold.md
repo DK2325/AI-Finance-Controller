@@ -8,10 +8,35 @@ against — so Phase 7 compares against recorded numbers rather than inferring t
 
 ## The one number that matters most
 
-**Moving the precision floor from 99.5% to 99.0% buys 26 points of coverage for 0.38
-points of precision.**
+**The operating point is `0.9564`, fixed before the sealed test set was read, and the
+sealed set gives 62.91% coverage at 99.9037% precision.** The sections below record how the
+point was chosen and what was known at the time; §*The seal broke* at the end records what
+it turned out to be worth.
 
-Measured out-of-sample (a split neither the classifier nor the calibrator saw):
+Measured on `data/test`, which neither the classifier, the calibrator, nor any tuning
+decision saw:
+
+| operating point | threshold | coverage | precision | false auto-matches |
+|---|---|---|---|---|
+| **pre-committed, chosen in advance** | 0.9564 | **62.91%** | 99.9037% | 3 |
+| best holding 99.5%, chosen in hindsight | 0.2500 | 72.75% | 99.7501% | 9 |
+| no floor | 0.0000 | 74.30% | 98.3959% | 59 |
+
+That is the entire thesis in one table, plus a second lesson the first row pays for: a
+threshold picked *after* seeing this data would have looked ten points better, and the only
+reason that gap can be quoted honestly is that it was not picked that way.
+
+A merchant is not choosing between "accurate" and "inaccurate"; they are choosing how much
+manual review to buy with how much risk. The curve here is unusually flat — precision holds
+above 99.75% from 1.0 down to 0.25 — so on this data the trade is mild until the floor is
+abandoned entirely.
+
+---
+
+## How the point was chosen, on the evaluation split
+
+Everything from here to *The seal broke* describes the selection, using the split the
+classifier and calibrator never saw. These are **not** the held-out numbers.
 
 | precision floor | coverage | precision | false auto-matches |
 |---|---|---|---|
@@ -19,10 +44,10 @@ Measured out-of-sample (a split neither the classifier nor the calibrator saw):
 | 99.0% | 77.65% | 99.1276% | 8 |
 | none | 82.98% | 94.8980% | 50 |
 
-That is the entire thesis in one table. A merchant is not choosing between "accurate" and
-"inaccurate"; they are choosing how much manual review to buy with how much risk. At
-99.5% the system hands back nearly half the batch for a human to look at. At 99.0% it
-hands back a fifth, and posts five more wrong matches out of ~600.
+**Moving the precision floor from 99.5% to 99.0% buys 26 points of coverage for 0.38 points
+of precision** — on that split. At 99.5% the system hands back nearly half the batch for a
+human to look at. At 99.0% it hands back a fifth, and posts five more wrong matches out of
+~600.
 
 **Selected: the 99.5% floor**, per architecture rule 4 — precision over coverage, because
 a false auto-match posts wrong money to a ledger while a miss costs a human thirty
@@ -194,11 +219,14 @@ same number Phase 7 reports as cost per 1,000 rows.
 
 ---
 
-# Pending: the operating point moves, and the numbers here are frozen until the seal breaks
+# Resolved: the operating point moved, and the sealed set settled it
 
-**Everything above and in the README reports threshold 0.9989 / 51.31% coverage. A change
-made on 23 August 2026 moves that to 0.9564 / 68.16%, and the documents are deliberately
-NOT updated until the sealed test set confirms it.**
+**This section was written while the numbers were frozen pending the seal. It is kept in
+its original form because the reasoning it records was made without knowing the answer, and
+that is what makes the outcome in *The seal broke* worth anything.** At the time, everything
+above and in the README reported threshold 0.9989 / 51.31% coverage; a change made on
+23 August 2026 moved that to 0.9564 / 68.16% on the evaluation split, and the documents were
+deliberately not updated until the sealed test set could confirm it.
 
 ## What changed
 
@@ -276,3 +304,35 @@ can be answered.
 Phase 7's run against `data/test`. If the held-out set reproduces ~68% at the floor, the
 number is earned and every document here can state it with the sealed measurement behind
 it. If it does not, we would have shipped a headline that a bug fix inflated.
+
+---
+
+## The seal broke
+
+**62.91% coverage at 99.9037% precision, 95% CI [99.7171%, 99.9672%], 3 false in 3,114.**
+Scored once, at 0.9564, with no retuning. Full report: `notes/phase-7-report.md`.
+
+**The 196-candidate block reproduced.** Coverage did not fall back toward 51%, which was the
+declared failure condition for this section's central worry. The discrete bet paid.
+
+**It did not reproduce at 68%, and that was predicted.** The pre-commitment registered
+"nearer 61% than 68%" on the strength of `data/scale`, and 62.91% is 1.91 points from 61
+against 5.09 from 68. The two unseen case types are why: `refund_netted` contributes 0 of
+200 and drags the aggregate down without saying anything about the block.
+
+**The floor held, and held better than this section feared.** The worry recorded above is
+that the floor was enforced on an estimate whose Wilson interval ran down to 99.02%, so
+"holding the floor" was a claim about a point estimate. Out of sample the point estimate
+rose to 99.9037% and the *entire* interval sits above 99.5%.
+
+**One thing this section did not anticipate.** Precision at 24,750 settlements on
+`data/scale` is 99.2369% — below the floor. The floor's fragility turned out to be real but
+located somewhere else entirely: not in the smallness of the evaluation sample, but in batch
+size. See `notes/failure-modes.md`, *Precision is measured at two batch sizes and they
+disagree*.
+
+**The step structure is also where a defect was hiding.** The `0.945205` step listed above
+as "breaches the floor" is the same step that consumes invoices below the operating point
+and denies them to their rightful owners — three cases on the sealed set. Recorded in
+`notes/failure-modes.md`, *An abstention that is not free*. The step table above was looking
+straight at it and the question being asked at the time was only about coverage.

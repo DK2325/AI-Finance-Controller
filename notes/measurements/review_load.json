@@ -1,0 +1,114 @@
+{
+  "note": "Data for the unit-economics paragraph. BUILD.md Phase 7: produce the data, the written interpretation is the human's own work. N and X are deliberately not chosen here -- they are properties of a merchant's finance team, not of this system.",
+  "measured": [
+    {
+      "label": "data/test (sealed)",
+      "batch": "data/test",
+      "settlements": 4950,
+      "reviewed_without_the_system_per_1000": 1000,
+      "reviewed_with_the_system_per_1000": 370.9,
+      "removed_from_review_per_1000": 629.1,
+      "share_removed": 0.629091,
+      "inference_cost_per_1000_inr": {
+        "input_tokens": 23894,
+        "output_tokens": 14368,
+        "low_inr": 0.6845,
+        "high_inr": 1.1373
+      }
+    },
+    {
+      "label": "data/scale",
+      "batch": "data/scale",
+      "settlements": 24750,
+      "reviewed_without_the_system_per_1000": 1000,
+      "reviewed_with_the_system_per_1000": 391.1,
+      "removed_from_review_per_1000": 608.9,
+      "share_removed": 0.608929,
+      "inference_cost_per_1000_inr": {
+        "input_tokens": 29554,
+        "output_tokens": 19149,
+        "low_inr": 0.8951,
+        "high_inr": 1.4854
+      }
+    }
+  ],
+  "unmeasured_inputs": {
+    "N": "settlements reconciled per analyst-hour, manually",
+    "X": "fully-loaded analyst cost per hour, in rupees"
+  },
+  "formula": {
+    "hours_removed_per_1000": "removed_from_review_per_1000 / N",
+    "value_per_1000": "(removed_from_review_per_1000 / N) * X",
+    "compare_against": "inference_cost_per_1000_inr"
+  },
+  "sensitivity_on_sealed_batch": [
+    {
+      "settlements_per_analyst_hour": 20,
+      "cost_per_hour_inr": 300,
+      "hours_removed_per_1000": 31.46,
+      "value_inr_per_1000": 9436.5,
+      "ratio_to_dearest_inference": 8297.3
+    },
+    {
+      "settlements_per_analyst_hour": 20,
+      "cost_per_hour_inr": 600,
+      "hours_removed_per_1000": 31.46,
+      "value_inr_per_1000": 18873.0,
+      "ratio_to_dearest_inference": 16594.6
+    },
+    {
+      "settlements_per_analyst_hour": 20,
+      "cost_per_hour_inr": 1000,
+      "hours_removed_per_1000": 31.46,
+      "value_inr_per_1000": 31455.0,
+      "ratio_to_dearest_inference": 27657.6
+    },
+    {
+      "settlements_per_analyst_hour": 40,
+      "cost_per_hour_inr": 300,
+      "hours_removed_per_1000": 15.73,
+      "value_inr_per_1000": 4718.25,
+      "ratio_to_dearest_inference": 4148.6
+    },
+    {
+      "settlements_per_analyst_hour": 40,
+      "cost_per_hour_inr": 600,
+      "hours_removed_per_1000": 15.73,
+      "value_inr_per_1000": 9436.5,
+      "ratio_to_dearest_inference": 8297.3
+    },
+    {
+      "settlements_per_analyst_hour": 40,
+      "cost_per_hour_inr": 1000,
+      "hours_removed_per_1000": 15.73,
+      "value_inr_per_1000": 15727.5,
+      "ratio_to_dearest_inference": 13828.8
+    },
+    {
+      "settlements_per_analyst_hour": 60,
+      "cost_per_hour_inr": 300,
+      "hours_removed_per_1000": 10.49,
+      "value_inr_per_1000": 3145.5,
+      "ratio_to_dearest_inference": 2765.8
+    },
+    {
+      "settlements_per_analyst_hour": 60,
+      "cost_per_hour_inr": 600,
+      "hours_removed_per_1000": 10.49,
+      "value_inr_per_1000": 6291.0,
+      "ratio_to_dearest_inference": 5531.5
+    },
+    {
+      "settlements_per_analyst_hour": 60,
+      "cost_per_hour_inr": 1000,
+      "hours_removed_per_1000": 10.49,
+      "value_inr_per_1000": 10485.0,
+      "ratio_to_dearest_inference": 9219.2
+    }
+  ],
+  "caveats": [
+    "Removal from review is not the same as removal of work: 3 false matches in 3,114 auto-matched rows were wrong, so a merchant accepting the auto-matched set accepts Rs 671,820 of misposted money on this batch.",
+    "The exception queue is not uniform. AMBIGUOUS_CANDIDATES is 26.7% actionable, so some of the reviewed rows cost an analyst time and yield nothing.",
+    "Precision at 24,750 settlements is 99.2369%, below the floor. Any value claimed at production volume inherits that, not the sealed 99.9037%."
+  ]
+}
