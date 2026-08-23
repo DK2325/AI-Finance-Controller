@@ -76,12 +76,75 @@ over narrations for evaluation rather than in the reconciliation path, and no jo
 entries are proposed in a default run. If both were enabled for every exception, the
 figures roughly triple — still under ₹10 per 1,000 settlements at the dearest rate.
 
+---
+
+## Measured at three deterministic shares
+
+*Data. The interpretation of it is not written here — see the note at the end of this
+section.*
+
+`data/train`'s figure above rests on a per-exception token rate measured over 100
+exceptions and then scaled to 1,198. The other two rows are whole populations with no
+scaling: every LLM-bound exception in the batch went through the `reason` job with the
+cache disabled, and the tokens are what the endpoint reported.
+
+| batch | settlements | deterministic share | LLM-bound | in/exc | out/exc | ₹ per 1,000 settlements |
+|---|---|---|---|---|---|---|
+| `data/train` | 4,945 | 51.06% | 1,198 | 220.0 | 168.0 | **₹1.83 – ₹3.03** |
+| `data/scale` | 24,750 | 65.42% | 3,347 | 218.5 | 141.6 | **₹0.90 – ₹1.49** |
+| `data/test` (sealed) | 4,950 | 69.77% | 555 | 213.1 | 128.2 | **₹0.68 – ₹1.14** |
+
+Raw output: `notes/measurements/unit_economics.json`. The `data/test` run was 28 calls,
+166.0s at 10.1 rpm, **0 stalled calls and a 0.00% schema failure rate**.
+
+### Two drivers moved, not one
+
+Worth separating, because the obvious model — cost falls because the deterministic layer
+explains more exceptions for free — accounts for only part of the drop.
+
+| | `data/train` | `data/test` | ratio |
+|---|---|---|---|
+| LLM-bound exceptions per 1,000 settlements | 242.3 | 112.1 | **0.463** |
+| output tokens per exception | 168.0 | 128.2 | **0.763** |
+| ₹ per 1,000 settlements (cheapest rate) | 1.83 | 0.68 | **0.372** |
+
+0.463 × 0.763 = 0.353, against a measured ratio of 0.372; the residual is input tokens,
+which barely moved (220.0 → 213.1). **So roughly two-thirds of the reduction is the
+deterministic share and one-third is shorter explanations per exception.** Attributing all
+of it to the deterministic share would overstate that layer's contribution by about half
+again.
+
+Why the explanations got shorter is **not** established, and the obvious candidate is ruled
+out. `reason` output length varies by reason code, so a different code mix would explain
+it — but the LLM-bound mix is almost the same on both batches:
+
+| | `BELOW_THRESHOLD` | `AMBIGUOUS_CANDIDATES` |
+|---|---|---|
+| `data/scale` | 92.44% | 7.56% |
+| `data/test` | 94.59% | 5.41% |
+
+A two-point shift in mix cannot produce a 0.763 factor in output tokens. Whatever is
+driving it is something else, and it is left open rather than given a plausible-sounding
+cause.
+
+### For interpretation
+
+The numbers above are recorded and checkable. What they mean for unit economics — whether
+a band this narrow makes provider choice a non-decision, what the right denominator is for
+a merchant, and how any of it should be presented to a finance reader — is deliberately not
+written here.
+
+---
+
 ## What would change these numbers
 
 - **A rate card moving.** Most likely downward; inference prices have only fallen.
 - **The exchange rate.** ±10% moves the band by ±10%; it does not change the conclusion.
-- **The deterministic share.** At 51.06% today. If it fell to 30%, the cost would rise by
-  roughly 40% — to about ₹4.25 per 1,000 at the dearest rate. Still negligible.
+- **The deterministic share.** Measured at 51.06%, 65.42% and 69.77% across three
+  batches, so it is a property of the batch rather than a constant. If it fell to 30%, the
+  cost would rise by roughly 40% against the `data/train` figure — to about ₹4.25 per 1,000
+  at the dearest rate. Note from the table above that it is not the only driver: output
+  tokens per exception moved by a factor of 0.763 across the same three batches.
 - **Enabling thinking.** Measured at 5.4× the output tokens for structurally identical
   results. That is the one change here that would matter, and it is the one thing every
   prompt explicitly declares off.

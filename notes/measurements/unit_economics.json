@@ -1,0 +1,119 @@
+{
+  "measured_on": "2026-08-23",
+  "basis": "tokens measured on NVIDIA's free hosted endpoint; priced against published third-party rates as of 2026-08-23; not billed",
+  "note": "Data only. The written interpretation belongs in notes/pricing.md and is not generated here.",
+  "test_run": {
+    "batch": "data/test",
+    "settlements": 4950,
+    "exceptions": 1836,
+    "deterministic_share": 0.6977,
+    "llm_bound": 555,
+    "by_reason": {
+      "AMBIGUOUS_CANDIDATES": 30,
+      "BELOW_THRESHOLD": 525,
+      "INVOICE_ALREADY_CLAIMED": 107,
+      "NO_CANDIDATE": 315,
+      "NO_INVOICE_LINK": 859
+    },
+    "wall_seconds": 166.0,
+    "achieved_rpm": 10.1,
+    "calls_total": 28,
+    "stalled_calls": 0,
+    "stalls_surviving_both_attempts": 0,
+    "schema_failure_rate": 0.0,
+    "overall_failure_rate": 0.0036,
+    "usage": {
+      "calls": 28,
+      "cached_calls": 0,
+      "retries": 0,
+      "input_tokens": 118274,
+      "output_tokens": 71124,
+      "billed_tokens": 189398,
+      "tokens_served_from_cache": 0,
+      "seconds": 1103.11
+    },
+    "cost_whole_batch": {
+      "input_tokens": 118274,
+      "output_tokens": 71124,
+      "low_usd": 0.038503,
+      "high_usd": 0.063972,
+      "low_inr": 3.3883,
+      "high_inr": 5.6295,
+      "spread": 1.661,
+      "basis": "tokens measured on NVIDIA's free hosted endpoint; priced against published third-party rates as of 2026-08-23; not billed",
+      "cheapest_rate": "DeepInfra / OpenRouter",
+      "dearest_rate": "Amazon Bedrock",
+      "usd_to_inr": 88.0
+    },
+    "per_1000_settlements": {
+      "input_tokens": 23894,
+      "output_tokens": 14368,
+      "low_inr": 0.6845,
+      "high_inr": 1.1373
+    },
+    "tokens_per_exception": {
+      "input": 213.1,
+      "output": 128.2
+    }
+  },
+  "points": [
+    {
+      "batch": "data/train",
+      "settlements": 4945,
+      "deterministic_share": 0.5106,
+      "llm_bound": 1198,
+      "input_tokens": 263560,
+      "output_tokens": 201264,
+      "per_1000_settlements": {
+        "input_tokens": 53298,
+        "output_tokens": 40701,
+        "low_inr": 1.8313,
+        "high_inr": 3.0316
+      },
+      "tokens_per_exception": {
+        "input": 220.0,
+        "output": 168.0
+      },
+      "source": "notes/pricing.md, per-exception rate measured over 100 exceptions",
+      "caveat": "per-exception tokens measured on a 100-exception sample, then scaled"
+    },
+    {
+      "batch": "data/scale",
+      "settlements": 24750,
+      "deterministic_share": 0.6542,
+      "llm_bound": 3347,
+      "input_tokens": 731450,
+      "output_tokens": 473935,
+      "per_1000_settlements": {
+        "input_tokens": 29554,
+        "output_tokens": 19149,
+        "low_inr": 0.8951,
+        "high_inr": 1.4854
+      },
+      "tokens_per_exception": {
+        "input": 218.5,
+        "output": 141.6
+      },
+      "source": "notes/measurements/scale_llm.json"
+    },
+    {
+      "batch": "data/test",
+      "settlements": 4950,
+      "deterministic_share": 0.6977,
+      "llm_bound": 555,
+      "input_tokens": 118274,
+      "output_tokens": 71124,
+      "per_1000_settlements": {
+        "input_tokens": 23894,
+        "output_tokens": 14368,
+        "low_inr": 0.6845,
+        "high_inr": 1.1373
+      },
+      "tokens_per_exception": {
+        "input": 213.1,
+        "output": 128.2
+      },
+      "source": "measured here, whole population, no scaling"
+    }
+  ]
+}

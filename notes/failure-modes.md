@@ -70,6 +70,16 @@ for realism, made knowingly.
 **What would fix it:** a `--difficulty hard` mode that composes two or three effects on a
 minority of rows, labelled as a compound case type.
 
+**Confirmed at Phase 7, and worse than "cleaner than reality" suggested.** The sealed run
+shows `refund_netted` failing completely on its own -- 0 of 200, because no blocking pass
+retrieves a credit that differs from its invoice by an arbitrary amount. A real row carrying
+a refund *and* a fee therefore does not sit somewhere between the two case types' rates; it
+inherits the total failure, because the candidate is still never generated. **Compound cases
+are not interpolations between their components, and reading this confusion matrix as if
+they were would overstate the system on exactly the rows a merchant sees most.** That makes
+the isolated-signal simplification a bigger caveat on the headline number than it looked
+when it was written as a legibility trade.
+
 ### Two bank dialects, not twenty
 
 HDFC and ICICI are modelled. A real merchant may bank with several institutions, and
@@ -263,7 +273,144 @@ One gap, now closed.
 
 ## Known limitations of the system
 
-*Populated from Phase 3 onward as real failures are measured.*
+Measured on the sealed test set, `data/test`, scored once at the pre-committed threshold.
+Full numbers in `notes/phase-7-report.md`; raw output in `notes/measurements/`.
+
+### It cannot reconcile a netted refund, at all
+
+**`refund_netted`: 0 auto-matched of 200. Wilson upper bound 1.88%.**
+
+This is the sharpest limit the system has, and the one a merchant is most likely to hit,
+because netting a refund against the same payout is ordinary gateway behaviour rather than
+an edge case. It is 4% of the modelled distribution.
+
+**Zero events in 200 is a decisive result, not an uncertain one**, and the instinct to treat
+a small denominator as uninformative is wrong here in a way worth spelling out. The interval
+is *narrow* -- 1.88 points wide -- precisely because nothing happened. `data/scale` produced
+0 of 1,000 on the same case type before the seal was broken, so this is two independent
+measurements at 5x different volumes agreeing exactly. No larger sample changes the reading.
+
+**The mechanism, which is the useful part.** Set beside the other held-out type, the two
+results say something more precise than "it does not generalise":
+
+| unseen case type | matched | what the arithmetic looks like |
+|---|---|---|
+| `tds_deducted` | 68.00% | credit = invoice x (1 - fixed rate) |
+| `refund_netted` | 0.00% | credit = invoice - an unrelated refund amount |
+
+The blocking `rate_amount` pass retrieves any credit differing from an invoice by a *rate*,
+and TDS is a rate. It was never told about TDS specifically and finds it anyway. A netted
+refund is not a rate: the shortfall is an arbitrary amount belonging to a different
+transaction, so no rate-based pass retrieves the pair and no candidate is ever generated for
+the classifier to score. **The failure is at blocking, not at the model.** The model cannot
+rank a candidate that does not exist.
+
+So the honest statement of the generalisation limit:
+
+> It generalises to an unseen deduction expressible as a rate on the amount, and fails
+> completely on an unseen netting structure, where no rate links the invoice to the credit.
+
+That is a claim about *which* unseen things transfer, and it is falsifiable. It also names
+the fix -- a subset-sum pass over recent refunds against the shortfall, which
+`core/subsetsum.py` already has the machinery for -- and that fix is deliberately **not
+made**, because building it after reading the test set is the tuning the seal exists to
+prevent.
+
+### `tds_deducted` is not a success story, it is an unresolved one
+
+68.00%, 95% CI [61.98%, 73.47%]. The interval covers `rounding_drift` (64.00%),
+`partial_payment` (65.00%) and `clean` (70.70%) -- three case types the model trained on.
+**250 rows cannot distinguish this from ordinary performance in either direction.** The
+defensible claim is that it is indistinguishable at this sample size, not that the model
+generalises well. Reporting it as a success would be reading a point estimate off an
+interval that does not support one.
+
+### Batched settlements are where coverage is actually lost
+
+`batched_settlement` is the weakest seen case type at **34.72%** (208 of 599) and the single
+largest source of missed links. It is not a new finding -- `data/train` gave 106 of 659 --
+but the sealed run states it most clearly: 599 truth rows produce **391 of the 1,836
+exceptions, 21.30%**, second only to `clean`, which is 4.6x larger. A payout batch covering several invoices has to be split before any one
+invoice can be matched, and subset-sum over the batch is doing that work imperfectly.
+
+### Precision is measured at two batch sizes and they disagree
+
+| batch | settlements | precision | false matches |
+|---|---|---|---|
+| `data/test` (sealed) | 4,950 | **99.9037%** | 3 in 3,114 |
+| `data/scale` | 24,750 | **99.2369%** | 115 in 15,071 |
+
+Same threshold, same model, same code. One clears the 99.5% floor and one does not.
+**Neither number is quotable alone.** The plausible mechanism is invoice contention rising
+with batch size -- more settlements competing for the same invoices means more chances for
+the wrong one to claim first -- and *that mechanism is untested*. What is not a hypothesis:
+the only figure this project has at production-like volume is the one below the floor.
+
+### An abstention that is not free
+
+**`resolve()` consumes invoices before the operating point is applied, so a candidate the
+system does not trust enough to act on can still deny the invoice to the settlement that
+owns it.**
+
+Found by chasing the deferred invoice-inference defect above and discovering that three of
+its five cases had a different cause. Measured on the sealed set: of 5 settlements wrongly
+told `INVOICE_ALREADY_CLAIMED`, **three had their invoice consumed by a candidate scoring
+0.945205 -- below the 0.9564 threshold, and therefore never auto-matched at all.**
+
+```
+INV-2026-002746  consumed by pay_000000002383  p=0.945205  not matched  owner setl_000000002315
+INV-2026-003234  consumed by pay_000000001869  p=0.945205  not matched  owner setl_000000002803
+INV-2026-003464  consumed by pay_000000002941  p=0.945205  not matched  owner setl_000000003033
+```
+
+The sequence in `model/predict.py:reconcile_batch` is `resolve(scored)` and *then* filter by
+threshold. Resolution is greedy over every scored candidate regardless of confidence, so the
+invoice is gone by the time the operating point rejects the claimant. Both settlements end
+up as exceptions: one for being below threshold, the other for an invoice "already claimed"
+by a settlement the system itself declined to act on.
+
+**This is the abstention argument failing in a direction it did not anticipate.** The design
+argues that declining is cheap -- a miss costs a human thirty seconds, a false match posts
+wrong money. That holds for the settlement doing the declining. It does not hold for the one
+whose invoice was taken on the way to the decline, and nothing in the risk-coverage framing
+accounts for that cost. All three sit at an identical calibrated probability, which is the
+isotonic step function's coarseness surfacing in a third place.
+
+**Not fixed here.** Applying the threshold before resolution, or releasing invoices held by
+below-threshold candidates, would change every number in `notes/phase-7-report.md`, and
+making that change after reading the sealed set is exactly what the pre-commitment forbids.
+It is logged with its measurement so the fix can be made and re-measured honestly against a
+fresh batch.
+
+### The other two are the false matches, seen from the other side
+
+The remaining two of the five are `INV-2026-003290` and `INV-2026-003495` -- both invoices
+that appear among the three false matches. **A false match and a spurious
+`INVOICE_ALREADY_CLAIMED` are one event counted twice**: one settlement takes an invoice it
+does not own, and the rightful owner is then sent to chase a duplicate that does not exist.
+The wrong money and the wasted operator time are the same defect billed to two different
+people, which is worth knowing before treating them as independent line items.
+
+### Confidence 1.0 does not mean safe
+
+Two of the three false matches scored **exactly p = 1.000000**. Isotonic regression's top
+step is saturated, so the highest calibrated probability the system can emit is shared by a
+large population containing a few wrong answers. Calibration is a statement about a bucket,
+not about a row, and the bucket at 1.0 is 98.05% correct rather than 100%. No confidence
+value this system can produce licenses skipping review of an individual high-value match.
+
+### Calibration degrades only where the model is out of its distribution
+
+ECE 0.010436 on the training eval split against **0.012031** on the sealed set. Removing the
+two unseen case types gives **0.007497** -- better than the split it is being compared
+against -- while those types alone give **0.113699**. They are 5.60% of candidates and
+concentrate in the middle bins, where the calibrator has least data. The two bins holding
+98% of candidates carry gaps of 0.0076 and 0.0109.
+
+**Where the system operates it is calibrated; where it is out of distribution it is not, and
+it cannot tell which it is in.** That last clause is the limitation. Nothing in the output
+distinguishes a confident score on a familiar case type from a confident score on an
+unfamiliar one.
 
 ---
 
@@ -304,9 +451,36 @@ than absent, and so a reviewer who raises it finds it already answered.
 
 ---
 
-## Open, unresolved: the decoder stall
+## Closed at Phase 7: the decoder stall
 
-**Status at the end of Phase 5: understood in mechanism, not in cause. Not closed.**
+**Status: CLOSED at Phase 7, measured across 168 calls. The estimate was 7.6x too high,
+and a different failure appeared that the spike never produced.**
+
+```
+estimated from ~30 calls        ~1 in 5-6  = 17-20%
+measured over 168 calls          4 in 168  =  2.38%     overstated 7.6x
+stalls surviving both attempts          0              <- the thing that had not happened
+schema failure rate                  0.0%
+```
+
+Both Phase 7 risks named below are answered. The rate did **not** rise under sustained
+load, it fell -- the small sample was the problem, not the load. And no stall survived both
+attempts, so no exception carries a cause we cannot explain.
+
+**The mitigation stays unadopted.** A per-item token budget was held in reserve for "if the
+Phase 7 rate is bad". It was not bad, so adopting it now would be carrying a code path that
+exists for a rate measured at a seventh of the estimate that motivated it.
+
+**What appeared instead was `LLM_BATCH_MISMATCH`, on 4 items of 3,347 (0.120%).** The
+envelope check that catches it was kept despite 120/120 holding in the spike, on the
+grounds that the cost of checking was a set comparison. At scale it fired. The general
+point is the one worth keeping: a check whose spike result is *perfect* is the check most
+tempting to remove, and 120 observations cannot distinguish 0% from 0.1%.
+
+**The original Phase 5 write-up follows, unedited, because a resolved risk is only
+instructive if what was believed at the time is still legible.**
+
+*Status at the end of Phase 5: understood in mechanism, not in cause. Not closed.*
 
 **What is known.** Under `json_schema` strict decoding, a call can stop producing content
 and emit whitespace until its token budget is gone. JSON grammar permits arbitrary
@@ -404,8 +578,32 @@ whether the model can copy a field, which it can.
 already taken, and an explanation that does not know what it is explaining is worse than
 useless. Withholding the code would improve the metric and degrade the product.
 
-**So the metric has to change, not the prompt.** Two options for Phase 7, neither taken
-yet:
+**So the metric has to change, not the prompt.** Two options were open, and **option 1 was
+taken and is now measured on held-out data** -- `evals/reasons.py` scores every exception's
+code against the answer key, and the sealed test set gives **97.55% actionability, 95% CI
+[96.74%, 98.16%], 1,791 justified against 45 unjustified in 1,836 exceptions**. On
+`data/train` the same measure gave 97.92%, so it held out of sample.
+
+The per-code breakdown is where it earns its keep, because the aggregate hides the one bad
+code:
+
+| code | total | justified | unjustified | actionability |
+|---|---|---|---|---|
+| `NO_CANDIDATE` | 315 | 315 | 0 | 100.00% |
+| `NO_INVOICE_LINK` | 859 | 858 | 1 | 99.88% |
+| `BELOW_THRESHOLD` | 525 | 511 | 14 | 97.33% |
+| `INVOICE_ALREADY_CLAIMED` | 107 | 99 | 8 | 92.52% |
+| **`AMBIGUOUS_CANDIDATES`** | **30** | **8** | **22** | **26.67%** |
+
+`AMBIGUOUS_CANDIDATES` is unactionable roughly three times in four, out of sample as it was
+in training (21.43% there). It is the smallest code by volume and by far the worst by
+quality: it sends an operator to choose between candidates that mostly cannot contain the
+answer, because blocking never retrieved the true credit. **That is a blocking-recall
+number wearing a reason code**, and the remedy is candidate generation rather than a
+different label -- which is exactly the distinction `evals/reasons.py` was built to make
+visible, working as intended.
+
+The two options as they were written, for the record:
 
 1. **Score against truth, not against ourselves.** `evals/` can see the answer key: for
    each exception, does the assigned code correctly describe why the settlement was not
@@ -417,7 +615,8 @@ yet:
 
 Option 1 is the one BUILD.md actually asks for (*"`ledgerloop eval` reports reason-code
 accuracy"*), and reason-code accuracy against truth is a different and better number than
-agreement with ourselves.
+agreement with ourselves. Option 2 was not built: a second prompt version to maintain, to
+measure something option 1 already answers better.
 
 **The general shape, which is the reusable part:** a metric that compares two things where
 one was told the other's answer is not measuring agreement, it is measuring transcription.
@@ -560,6 +759,12 @@ Not a resolution bug; a discrimination one, and the same root cause as the secti
 code is technically true and still unactionable: it sends an operator to check a duplicate
 that is not one, when the real fault is that `core/invoices.py` inferred the wrong invoice
 through the narration. Left for Phase 7, sized at two rows in 4,945.
+
+**Chased at Phase 7, and it was not what the note assumed.** Out of sample the count is
+**5 in 4,950 settlements, 0.1010%, 95% CI [0.0432%, 0.2363%]** -- and in three of the five
+the cause is not invoice inference at all. See *An abstention that is not free* below.
+Sizing a defect before finding its cause put the wrong name on it. The number was roughly
+right and the diagnosis was wrong, which is the more expensive half to get wrong.
 
 ---
 
