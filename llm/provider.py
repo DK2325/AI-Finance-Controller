@@ -189,15 +189,30 @@ _METHOD_KEYWORDS = {
 }
 
 
-def _counterparty_guess(narration: str) -> str:
-    """The longest run of letters, which is what a name usually is in a mangled narration.
+_NARRATION_NOISE = {
+    "NEFT", "IMPS", "RTGS", "UPI", "ACH", "NACH", "REF", "TRF", "PMT", "INF",
+    "PAYMENT", "SETTLEMENT", "TRANSFER", "CREDIT", "DEBIT", "BANK", "FROM",
+}
 
-    Crude on purpose. The mock is not meant to be a good parser -- it is meant to be a
-    *plausible* one, so that the layers above it do real work on real-shaped input.
+
+def _counterparty_guess(narration: str) -> str:
+    """The first two name-like words, which is what a counterparty usually is.
+
+    Crude on purpose -- the mock is meant to be a *plausible* parser, not a good one, so
+    the layers above it do real work on real-shaped input.
+
+    Tokenised on non-alphanumeric boundaries rather than by scanning for letter runs. The
+    difference matters: a letter-run scan pulls `HDFC` out of the IFSC code `HDFC0000123`
+    and offers it as the counterparty, which is both wrong and *unverifiable* -- `HDFC` is
+    not a token of the narration, only a substring of one, so the provenance gate rejects
+    it. That is the gate behaving correctly, and a mock that trips it on every clean run
+    would make --mock-llm report a false provenance failure rate.
     """
-    words = re.findall(r"[A-Za-z]{3,}", narration)
-    skip = {"NEFT", "IMPS", "RTGS", "UPI", "CR", "DR", "REF", "TRF", "PMT", "BY", "TO", "FROM"}
-    kept = [w for w in words if w.upper() not in skip]
+    tokens = [t for t in re.split(r"[^A-Za-z0-9]+", narration) if t]
+    kept = [
+        t for t in tokens
+        if t.isalpha() and len(t) >= 3 and t.upper() not in _NARRATION_NOISE
+    ]
     return " ".join(kept[:2]).upper() if kept else ""
 
 

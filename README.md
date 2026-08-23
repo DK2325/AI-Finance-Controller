@@ -152,6 +152,36 @@ bill is a consequence of that rule, not a reason for it.
 > code. It is re-measured against the real enumeration in Phase 5 and this line carries
 > the measured figure once it does.
 
+### The schema is a constraint, not a request
+
+The prompt asks. The schema *forbids*. Under `json_schema` strict these are enforced at
+decode time — the model does not decline to emit an invalid value, it cannot emit one.
+
+**The model cannot emit a GL code that does not exist.** The chart of accounts is a closed
+`Literal` of ten codes. A journal entry posted to an invented account reads as
+authoritative and fails at the moment someone acts on it; no prompt instruction makes that
+impossible, and a closed enum does.
+
+**The model is not offered `NO_CANDIDATE`.** It may tag an exception only with the three
+JUDGEMENT-family codes. `NO_CANDIDATE` is a fact the pipeline established — no candidate
+survived blocking — not a judgement available to a model. The vocabulary it is given is
+the vocabulary of the decision it is actually allowed to make.
+
+**Every field is required; optional ones are nullable rather than defaulted.** An omitted
+field is indistinguishable from one the model forgot. Forcing an explicit `null` makes "I
+found no UTR" an answer rather than a silence.
+
+**`additionalProperties: false`.** The model cannot invent a field we did not ask for.
+
+This is the same principle as the layer ordering: *the guarantee is structural, not
+requested.* A prompt that says "only use these account codes" is a hope with good odds. A
+`Literal` is arithmetic.
+
+**Where the technique stops.** Constrained decoding can fix a number's shape, never a sum
+of several. Nothing in a JSON Schema can express "the debits equal the credits" — that
+lives in a Pydantic validator, checked after decoding, with one retry before the entry is
+dropped. Knowing where your own control stops is what makes the rest of it credible.
+
 ## Untrusted input, and what actually defends against it
 
 Bank narrations are free text written by systems we do not control. They are untrusted

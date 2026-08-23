@@ -160,6 +160,15 @@ class ReasonCode(StrEnum):
         "retry. Never parsed as free text -- the exception is the correct outcome.",
     )
 
+    LLM_BATCH_MISMATCH = (
+        "LLM_BATCH_MISMATCH",
+        Family.FAILURE,
+        "The batch envelope did not reconcile: an item we sent came back with no entry, "
+        "or came back twice, or an entry arrived for an id we never sent. Kept apart "
+        "from LLM_SCHEMA_INVALID because the remedy is different -- a smaller batch, "
+        "rather than a changed prompt or schema.",
+    )
+
     LLM_RATE_LIMITED = (
         "LLM_RATE_LIMITED",
         Family.FAILURE,

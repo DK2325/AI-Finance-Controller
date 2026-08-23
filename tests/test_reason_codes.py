@@ -49,6 +49,8 @@ FROZEN: tuple[tuple[str, str], ...] = (
     ("AMBIGUOUS_CANDIDATES", "judgement"),
     ("LLM_MALFORMED_RESPONSE", "failure"),
     ("LLM_SCHEMA_INVALID", "failure"),
+    # Added 23 Aug 2026, Phase 5 step 5, when the handler gained batch reconciliation.
+    ("LLM_BATCH_MISMATCH", "failure"),
     ("LLM_RATE_LIMITED", "failure"),
     ("LLM_TRANSPORT_FAILED", "failure"),
     ("FIELD_PROVENANCE_FAILED", "failure"),

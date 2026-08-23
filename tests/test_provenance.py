@@ -97,6 +97,18 @@ def test_a_utr_that_is_a_fragment_of_a_longer_number_does_not_verify() -> None:
     assert not verify({"utr": "300000004412"}, source).passed
 
 
+def test_a_name_pulled_out_of_an_ifsc_code_does_not_verify() -> None:
+    """Found by the handler tests, and worth keeping.
+
+    `HDFC0000123` is a bank branch code. A parser scanning for letter runs pulls `HDFC`
+    out of the middle of it and offers it as the counterparty -- wrong, and wrong in a way
+    that looks entirely reasonable in a response. Token-coverage catches it because `HDFC`
+    is a substring of the narration but not a *token* of it.
+    """
+    assert not verify({"counterparty_name": "HDFC ACME"}, ACME).passed
+    assert verify({"counterparty_name": "ACME INDUSTRIES"}, ACME).passed
+
+
 def test_an_advisory_failure_drops_the_field_but_keeps_the_item() -> None:
     """payment_method is a classification. Being unsupported is worth recording, not fatal."""
     result = verify({"utr": "300000004412", "payment_method": "card"}, ACME)
