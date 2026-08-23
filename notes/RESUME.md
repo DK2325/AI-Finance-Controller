@@ -102,9 +102,16 @@ Three prompts, a provider seam, and a gate that makes the LLM's output verifiabl
    ones. Adds `model_name`, `prompt_version`, `thinking_enabled`, `provider`,
    `cache_hit`, `token_cost_inr`.
 
-9. **Prompt-injection fixture.** Bank narrations are untrusted input. The provenance gate
-   makes injection structurally hard — injected instructions are not present in the
-   source narration and so cannot pass a substring check — but it gets its own test.
+9. **Prompt-injection fixture.** Bank narrations are untrusted input.
+
+   ~~The provenance gate makes injection structurally hard — injected instructions are
+   not present in the source narration and so cannot pass a substring check.~~
+   **Wrong, corrected 23 Aug in `notes/injection.md`.** The narration is exactly where
+   injected text lives, so an injected UTR passes provenance honestly. What makes
+   injection inert is architecture rule 2: the extracted value only becomes a match if a
+   gateway settlement independently carries the same UTR *and* the classifier agrees on
+   amount, date and counterparty. Provenance catches the model's own mis-attribution;
+   layer ordering catches the adversary. Two controls, two threats.
 
 **Exit criterion to hold to:** `--mock-llm` runs the whole pipeline with **no key
 present**, asserted by a test that unsets the environment variable.
