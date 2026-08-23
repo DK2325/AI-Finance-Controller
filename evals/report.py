@@ -57,7 +57,9 @@ def markdown_table(report: dict) -> str:
         "| Metric | Value |",
         "|---|---|",
         f"| Auto-match rate (coverage) | {s['coverage']:.2%} |",
-        f"| Precision on auto-matched | {s['precision']:.2%} |",
+        f"| Precision on auto-matched | {s['precision']:.2%} "
+        f"(95% CI {s['precision_ci_low']:.2%}-{s['precision_ci_high']:.2%}, "
+        f"{s['n_false_positives']} false in {s['n_predicted']:,}) |",
         f"| Recall of true links | {s['recall']:.2%} |",
         f"| Money-weighted precision | {s['money_weighted_precision']:.4%} |",
         f"| Money error ratio (Rs wrong / Rs at stake) | {s['money_error_ratio']:.4%} |",

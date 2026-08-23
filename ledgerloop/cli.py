@@ -272,7 +272,11 @@ def eval_(
     s = report["score"]
     typer.echo(f"\nrun {run}  batch {report['batch_dir']}  threshold {threshold}")
     typer.echo(f"  coverage                 {s['coverage']:.2%}")
-    typer.echo(f"  precision                {s['precision']:.2%}")
+    typer.echo(
+        f"  precision                {s['precision']:.2%}"
+        f"  (95% CI {s['precision_ci_low']:.2%}-{s['precision_ci_high']:.2%},"
+        f" {s['n_false_positives']} false in {s['n_predicted']:,})"
+    )
     typer.echo(f"  recall                   {s['recall']:.2%}")
     typer.echo(f"  money-weighted precision {s['money_weighted_precision']:.4%}")
     typer.echo(f"  money error ratio        {s['money_error_ratio']:.4%}")

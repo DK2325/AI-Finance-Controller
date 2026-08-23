@@ -587,3 +587,36 @@ the thing behind that boundary misbehaves, so keep the raw value alongside the c
 None of this makes the numbers in this README certain. It makes the *uncertainty* the
 subject of measurement rather than a matter of confidence, which is the only version of
 the claim worth making.
+
+---
+
+## A failing test is a system. Reading a docstring isn't.
+
+Three claims *about our own code* have been wrong in the reassuring direction:
+
+| the claim | how wrong | how it was caught |
+|---|---|---|
+| "the provenance gate makes injection structurally hard" | backwards -- the narration is where injected text lives | thinking about the adversary's actual move |
+| "`NO_CANDIDATE`: no bank credit resembled this payout" | written for settlements with five candidates | a truth-scored metric |
+| "`resolve_indices` mirrors `model/predict.py` exactly" | unstable sort against a stable one; worth 17 points of coverage | reading the docstring next to the code |
+
+The first two were caught by measurement. The third was caught by someone happening to read
+a comment carefully on the right afternoon.
+
+**That is not a system.** A property test that runs both implementations over randomised
+inputs and fails when they disagree is. It now exists
+(`tests/test_model.py::test_the_training_resolver_and_the_inference_resolver_agree`), and it
+is built with deliberately repeated probabilities -- three distinct values across sixty
+candidates -- because the real distribution has 99.7% of candidates tied, and a random test
+using distinct floats would never exercise the path that matters.
+
+That last point is the recurring one. Three tests in this project were nearly useless until
+they were built to be capable of failing:
+
+*   the **exclusion test**, which needed a vacuity guard or it would have passed against an
+    empty package;
+*   **experiment A**, which needed a control arm, because a non-deterministic failure can
+    produce a clean removal arm by luck;
+*   **this one**, which needed tied inputs, because ties are the path being tested.
+
+> **A test that cannot fail is documentation with a green tick.**

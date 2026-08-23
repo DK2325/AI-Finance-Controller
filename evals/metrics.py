@@ -17,6 +17,25 @@ from pathlib import Path
 
 from evals.models import Prediction, Triple, TruthRow
 
+# 95% two-sided.
+WILSON_Z = 1.959964
+
+
+def wilson(successes: int, trials: int, z: float = WILSON_Z) -> tuple[float, float]:
+    """Wilson score interval for a proportion. Returns (low, high).
+
+    Used wherever a precision or a rate is reported. A rate computed from a handful of
+    events carries far less information than its decimal places suggest, and the interval
+    is the honest way to say so.
+    """
+    if trials <= 0:
+        return (0.0, 1.0)
+    p = successes / trials
+    denominator = 1 + z * z / trials
+    centre = (p + z * z / (2 * trials)) / denominator
+    spread = (z / denominator) * ((p * (1 - p) / trials + z * z / (4 * trials * trials)) ** 0.5)
+    return (max(0.0, centre - spread), min(1.0, centre + spread))
+
 
 def to_paise(text: str) -> int:
     """Parse a rupee string to integer paise. Decimal, never float."""
@@ -108,8 +127,27 @@ class Score:
     n_orphans_refused: int
     orphan_refusal_rate: float
 
+    @property
+    def precision_interval(self) -> tuple[float, float]:
+        """A 95% Wilson interval on precision, because the point estimate oversells itself.
+
+        Precision here is measured by *how many false matches occurred*, and that count is
+        small by design -- the whole system is tuned to make it small. At 4 false in 804,
+        the interval is [99.02%, 99.99%]: the estimate cannot distinguish 99.5% from 99.0%.
+        Reporting "99.5031%" puts four decimal places on a quantity measured by four
+        events.
+
+        Wilson rather than the normal approximation: at p near 1 and small counts, the
+        normal interval runs past 100% and is asymmetric in the wrong direction.
+        """
+        return wilson(self.n_true_positives, self.n_predicted)
+
     def as_dict(self) -> dict:
-        return asdict(self)
+        row = asdict(self)
+        low, high = self.precision_interval
+        row["precision_ci_low"] = round(low, 6)
+        row["precision_ci_high"] = round(high, 6)
+        return row
 
 
 def score_at(

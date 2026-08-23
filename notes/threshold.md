@@ -191,3 +191,79 @@ Phase 6's slider should surface all three. A curve showing coverage and precisio
 asks the merchant to optimise half a problem; showing estimated cost alongside makes the
 unit-economics argument interactive rather than a paragraph in the README, and it is the
 same number Phase 7 reports as cost per 1,000 rows.
+
+---
+
+# Pending: the operating point moves, and the numbers here are frozen until the seal breaks
+
+**Everything above and in the README reports threshold 0.9989 / 51.31% coverage. A change
+made on 23 August 2026 moves that to 0.9564 / 68.16%, and the documents are deliberately
+NOT updated until the sealed test set confirms it.**
+
+## What changed
+
+`model/train.resolve_indices` claimed in its docstring to mirror `model/predict.resolve`
+"exactly". It used `np.argsort(-p)` -- an *unstable* sort -- so ties were broken by whatever
+order the sort left them in. With **99.7% of candidates sharing an exact calibrated
+probability**, that decided nearly every contested invoice during operating-point selection.
+The threshold was chosen against a badly-resolved candidate set and then applied to a
+differently-resolved one.
+
+Both resolvers now break ties on the same evidence. Out of sample, at the same 99.5% floor:
+
+| | before | after |
+|---|---|---|
+| threshold | 0.9989 | 0.9564 |
+| coverage | 51.31% | **68.16%** |
+| precision | 99.5050% | 99.5031% |
+| ECE | 0.01044 | 0.01044 |
+
+## Why it is not adopted yet, and the dependency a reviewer will look for
+
+**68% coverage depends on one 196-candidate block calibrating where it did. If the sealed
+set places that block differently, coverage falls back toward 51%.**
+
+The step structure on the evaluate split makes this explicit:
+
+```
+value      on step   cum n   coverage   precision   false
+1.000000      605     605     51.23%    99.6694%       2
+0.998921        1     607     51.40%    99.6705%       2   <- old threshold
+0.992754      196     803     67.99%    99.5019%       4   <- THE STEP
+0.956431        1     804     68.08%    99.5025%       4   <- selected
+0.945205       98     903     76.46%    99.3355%       6   <- breaches the floor
+```
+
+**16.6 of the 16.85 points come from one step.** The gain is real and entirely discrete.
+
+The threshold itself is *well placed*: it sits in a 0.028-wide empty gap, and a +/-0.001
+perturbation moves coverage by 0.08%. So this is not a threshold that could slip. It is a
+**single discrete bet** on one block of candidates, and those are different risks. The next
+step down admits 98 more candidates and breaks the floor at 99.3355%.
+
+## The floor is enforced on an estimate, and at these counts that is weaker than it looks
+
+The operating point is the highest-coverage point holding precision >= 99.5% *on the
+evaluation split*. At that point:
+
+```
+auto-matched pairs   804
+false                  4
+precision       99.5025%   95% Wilson CI [99.02%, 99.99%]
+```
+
+**The floor sits inside the interval.** The estimate cannot distinguish 99.5% from 99.0%,
+so "holding the floor" is a statement about a point estimate, not about the true rate. Four
+decimal places on a quantity measured by four events is a precision claim the sample does
+not support, and every precision figure in this project now carries its Wilson interval and
+its raw counts for that reason.
+
+**The trade in units a finance operator reasons about:** 2 false becomes 4 false, to gain
+197 matches. That is a better sentence than any percentage, and it invites a question that
+can be answered.
+
+## What would settle it
+
+Phase 7's run against `data/test`. If the held-out set reproduces ~68% at the floor, the
+number is earned and every document here can state it with the sealed measurement behind
+it. If it does not, we would have shipped a headline that a bug fix inflated.
