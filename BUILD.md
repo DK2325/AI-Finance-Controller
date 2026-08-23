@@ -189,7 +189,17 @@ scikit-learn, LightGBM, Pydantic, FastAPI, SQLAlchemy, Alembic,
 > routing, SSR or component library; the slider is ~60 lines of vanilla JS over a JSON
 > endpoint.
 >
-> **2. `--difficulty {easy,hard}` is removed from the CLI.** It was accepted and did
+> **2. `docker compose` runs two services, not three.** BUILD.md's layout is db + api +
+> web. The API serves the static frontend, so the third container was redundant — and
+> keeping a separate image for it meant keeping two Dockerfiles in sync by hand, which
+> failed: a cold `docker compose up` from a fresh clone stopped building entirely, in three
+> ways at once, all of them fixes that had been made to the hosted image and not carried
+> across. There is now one `Dockerfile`, built by both compose and the hosted deployment.
+> Port 3000 is still published alongside 8000, because BUILD.md and the README both name it
+> and a reviewer who typed it should not meet a dead port. See `notes/failure-modes.md`,
+> "The path you exercise is the only one that works".
+>
+> **3. `--difficulty {easy,hard}` is removed from the CLI.** It was accepted and did
 > nothing from Phase 1 onward. Wiring it means compound-case generation — a `datagen/`
 > feature this submission does not need — and a flag that lies about what it does is worse
 > than an absent flag, because it invites someone to rely on it.

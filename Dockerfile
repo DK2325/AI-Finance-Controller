@@ -73,6 +73,13 @@ COPY runs/v1-train/ ./runs/v1-train/
 COPY data/demo/ ./data/demo/
 COPY data/train/ ./data/train/
 
+# docker compose overrides the entrypoint with this to run migrations first. The hosted
+# deployment does not: Railway's Postgres is managed and the demo reads runs from the
+# filesystem, so a migration failure there would take the service down for something no
+# screen needs.
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Railway assigns $PORT and it is not 8000. Defaulted so the image also runs locally with
 # a bare `docker run`.
 ENV PORT=8000

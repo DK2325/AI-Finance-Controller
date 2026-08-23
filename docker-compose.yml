@@ -2,6 +2,29 @@
 # otherwise derive an illegal project name from it (spaces, capitals) and refuse to start.
 name: ledgerloop
 
+# TWO SERVICES, NOT THREE, AND ONE IMAGE SHARED WITH THE HOSTED DEPLOYMENT.
+#
+# This file used to build a separate `api` image from docker/api.Dockerfile and a `web`
+# container from web/server.js. That is a deviation from BUILD.md's three-service layout
+# and it is recorded there, because the reason is a defect this arrangement caused.
+#
+# Keeping two Dockerfiles meant keeping them in sync by hand, and they drifted the moment
+# the hosted one was fixed and this one was not. A cold `docker compose up` from a fresh
+# clone failed outright -- and it failed in three separate ways at once:
+#
+#   1. web/server.js was added to .dockerignore for the hosted image, so the web container
+#      could not build at all.
+#   2. docker/api.Dockerfile copied no runs/, data/ or web/static, so the dashboard would
+#      have been empty even if it had started.
+#   3. docker/api.Dockerfile installed no libgomp1, so any model load would raise the same
+#      OSError that broke the deployed demo batch.
+#
+# All three existed because the deployed path was exercised daily and the documented one
+# was not. The fix is not to sync them more carefully; it is to have one image, so local
+# and hosted are the same artifact running the same code, and drift has nowhere to live.
+#
+# The API serves the static frontend, so the third container is redundant.
+
 services:
   db:
     image: postgres:16-alpine
@@ -23,10 +46,11 @@ services:
       - "5432:5432"
     restart: unless-stopped
 
-  api:
+  app:
+    # The same Dockerfile the hosted deployment builds. One image, two run modes.
     build:
       context: .
-      dockerfile: docker/api.Dockerfile
+      dockerfile: Dockerfile
     depends_on:
       db:
         condition: service_healthy
@@ -35,26 +59,21 @@ services:
       NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
       NVIDIA_BASE_URL: ${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
       NVIDIA_MODEL: ${NVIDIA_MODEL:-nvidia/nemotron-3-super-120b-a12b}
+      PORT: 8000
+    # Migrations first, then serve. Alembic's `upgrade head` is a no-op on an
+    # already-current database, so this is safe on every start rather than only the first.
+    entrypoint: ["/usr/local/bin/entrypoint.sh"]
     ports:
+      # 3000 as well as 8000, because BUILD.md and the README both say 3000 and a reviewer
+      # who typed that should not meet a dead port.
       - "8000:8000"
+      - "3000:8000"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/health')\""]
       interval: 10s
       timeout: 5s
       retries: 6
       start_period: 20s
-    restart: unless-stopped
-
-  web:
-    build:
-      context: .
-      dockerfile: docker/web.Dockerfile
-    depends_on:
-      - api
-    environment:
-      API_BASE_URL: http://api:8000
-    ports:
-      - "3000:3000"
     restart: unless-stopped
 
 volumes:

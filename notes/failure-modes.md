@@ -681,3 +681,57 @@ a system; the second is a property of it.
 Every one of the three was found by an implausible reading rather than by review: a share
 that jumped 8 points, a cost of ₹0.00, a row count off by five. That is the same
 diagnostic as everywhere else in this file — *is this reading physically possible?*
+
+---
+
+## The path you exercise is the only one that works
+
+**A cold `docker compose up` from a fresh clone did not build at all.** Not "started with an
+empty dashboard" — the build failed on its first step. This was the primary run path
+BUILD.md promises and the one a reviewer would try first.
+
+Three separate defects, all present at once:
+
+| defect | cause |
+|---|---|
+| the web container could not build | `web/server.js` was added to `.dockerignore` for the hosted image |
+| the dashboard would have been empty | `docker/api.Dockerfile` copied no `runs/`, `data/` or `web/static/` |
+| any model load would raise `OSError` | `docker/api.Dockerfile` installed no `libgomp1` |
+
+Every one of them is a fix that *was* made — to the hosted image — and not carried across.
+The hosted path was exercised several times a day while building against a live URL. The
+compose path had not been run end to end since Phase 0.
+
+**Nothing had broken. The two paths had simply stopped being the same thing**, one change at
+a time, each of them correct in isolation.
+
+### The fix is not more discipline
+
+The obvious response is to remember to update both Dockerfiles. That is the response that
+produced this, because the drift did not come from carelessness — each change was right for
+the file it touched, and there was no moment at which someone chose not to update the other.
+
+So the duplication is gone instead. One `Dockerfile`, built by both `docker compose` and
+Railway; the API serves the static frontend, which removes the third container entirely;
+compose overrides the entrypoint to run migrations first and nothing else differs. **Local
+and hosted are now the same artifact running the same code**, and drift has nowhere to live.
+
+### The same shape, for the third time
+
+| what claimed to match | what actually diverged | how it was caught |
+|---|---|---|
+| `resolve_indices` "mirrors model/predict.py exactly" | an unstable sort against a stable one — worth 17 points of coverage | reading the docstring next to the code |
+| `docker/api.Dockerfile` and the root `Dockerfile` | three fixes applied to one and not the other | running the cold path for the first time in weeks |
+| the mock provider and the real response shape | *designed against* — the mock walks the schema so it cannot fall behind | asking how the instrument would lie |
+
+Two of the three were caught by luck. The third was caught by design, and it is the only
+one that could not have gone unnoticed.
+
+> **Two things that must stay identical will not, unless something makes them the same
+> thing.** A test that fails on divergence is the weaker version of this; having one thing
+> is the stronger one. Prefer deleting the duplicate to synchronising it.
+
+**The practical rule this leaves:** whichever path you run daily is the one that works. Any
+other path is a claim, and it decays silently from the moment it stops being exercised.
+Phase 8 should run the cold start again from a fresh clone, because this one is now a path
+that has been exercised exactly once.
