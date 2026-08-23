@@ -12,8 +12,26 @@ DEFAULT_DATABASE_URL = "postgresql+psycopg://ledgerloop:ledgerloop@localhost:543
 
 
 def database_url() -> str:
-    """Resolve the connection string. No hardcoded credentials in code paths."""
-    return os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
+    """Resolve the connection string. No hardcoded credentials in code paths.
+
+    THE SCHEME IS NORMALISED, AND THAT IS NOT COSMETIC
+
+    Managed Postgres providers hand out `postgresql://...` (Railway, Render) or the older
+    `postgres://...` (Heroku's legacy form). SQLAlchemy reads the scheme as the *driver*,
+    and bare `postgresql://` means psycopg2 -- which this project does not install; it uses
+    psycopg 3. So an injected DATABASE_URL that is perfectly correct fails to connect, and
+    fails in a way that looks like a network problem rather than a driver one.
+
+    Found in deployment rather than in testing, because locally DATABASE_URL is absent and
+    the default already names the driver. Compose sets it explicitly with `+psycopg`, so
+    that path never exercised the bare form either.
+    """
+    url = os.environ.get("DATABASE_URL") or DEFAULT_DATABASE_URL
+    for bare, driven in (("postgresql://", "postgresql+psycopg://"),
+                         ("postgres://", "postgresql+psycopg://")):
+        if url.startswith(bare):
+            return driven + url[len(bare):]
+    return url
 
 
 # NVIDIA NIM, OpenAI-compatible. See notes/decisions.md for why this provider.

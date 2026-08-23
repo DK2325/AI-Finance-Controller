@@ -253,3 +253,44 @@ def test_the_dashboard_is_a_pure_read(summary) -> None:
     first = dashboard(load_run(RUN))
     second = dashboard(load_run(RUN))
     assert first == second
+
+
+# ------------------------------------------------- the deployment findings
+
+
+def test_a_managed_postgres_url_is_given_a_driver(monkeypatch) -> None:
+    """Railway and Render inject `postgresql://`; Heroku's legacy form is `postgres://`.
+
+    SQLAlchemy reads the scheme as the driver, and bare `postgresql://` means psycopg2 --
+    which this project does not install. A perfectly correct injected URL therefore fails
+    to connect, and fails looking like a network problem rather than a driver one.
+
+    Found on the first live deployment: health reported `database: false` with the
+    reference correctly set. Locally DATABASE_URL is absent and the default already names
+    the driver, and compose sets it explicitly with `+psycopg`, so neither path ever
+    exercised the bare form.
+    """
+    from ledgerloop.config import database_url
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@host:5432/db")
+    assert database_url() == "postgresql+psycopg://u:p@host:5432/db"
+
+    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@host:5432/db")
+    assert database_url() == "postgresql+psycopg://u:p@host:5432/db"
+
+
+def test_a_url_that_already_names_a_driver_is_left_alone(monkeypatch) -> None:
+    from ledgerloop.config import database_url
+
+    explicit = "postgresql+psycopg://u:p@host:5432/db"
+    monkeypatch.setenv("DATABASE_URL", explicit)
+    assert database_url() == explicit
+
+
+def test_an_empty_database_url_falls_back_rather_than_producing_a_broken_one(monkeypatch) -> None:
+    """Railway sets an empty string when a reference does not resolve, and `os.environ.get`
+    with a default returns that empty string rather than the default."""
+    from ledgerloop.config import DEFAULT_DATABASE_URL, database_url
+
+    monkeypatch.setenv("DATABASE_URL", "")
+    assert database_url() == DEFAULT_DATABASE_URL
