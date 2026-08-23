@@ -20,11 +20,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from itertools import combinations
 
+# The reason-code vocabulary lives in llm/codes.py because Phase 5 owns it, and it is
+# stdlib-only precisely so this import costs core/ nothing. See that module's header.
+from llm.codes import ReasonCode
+
 MAX_SUBSET_SIZE = 5
 MAX_BUCKET_SIZE = 25
 PAISE_TOLERANCE = 5
 
-REASON_CAPPED = "SUBSET_SEARCH_CAPPED"
+REASON_CAPPED = ReasonCode.SUBSET_SEARCH_CAPPED
 
 
 @dataclass
