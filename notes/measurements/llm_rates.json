@@ -1,0 +1,95 @@
+{
+  "model": "nvidia/nemotron-3-super-120b-a12b",
+  "n": 100,
+  "wall_seconds": 185.7,
+  "batches": 5,
+  "schema_failure_rate": 0.0,
+  "overall_failure_rate": 0.0,
+  "by_reason": {},
+  "provenance": {
+    "items": 100,
+    "items_failed": 0,
+    "item_failure_rate": 0.0,
+    "fields_checked": 366,
+    "fields_absent": 0,
+    "field_failure_rate": 0.0,
+    "by_field": {}
+  },
+  "provenance_by_field": {
+    "counterparty_name": {
+      "present": 100
+    },
+    "payment_method": {
+      "empty": 2,
+      "present": 98
+    },
+    "reference_number[0]": {
+      "empty": 10,
+      "present": 90
+    },
+    "reference_number[1]": {
+      "present": 15
+    },
+    "utr": {
+      "empty": 37,
+      "present": 63
+    }
+  },
+  "usage": {
+    "calls": 6,
+    "cached_calls": 0,
+    "retries": 1,
+    "input_tokens": 8651,
+    "output_tokens": 17256,
+    "billed_tokens": 25907,
+    "tokens_served_from_cache": 0,
+    "seconds": 185.68
+  },
+  "call_log": [
+    {
+      "seconds": 69.14,
+      "input_tokens": 1551,
+      "output_tokens": 2028,
+      "truncated": false,
+      "retry": false
+    },
+    {
+      "seconds": 52.22,
+      "input_tokens": 1464,
+      "output_tokens": 8000,
+      "truncated": true,
+      "retry": false
+    },
+    {
+      "seconds": 19.05,
+      "input_tokens": 1464,
+      "output_tokens": 1972,
+      "truncated": false,
+      "retry": true
+    },
+    {
+      "seconds": 11.38,
+      "input_tokens": 1448,
+      "output_tokens": 1735,
+      "truncated": false,
+      "retry": false
+    },
+    {
+      "seconds": 12.95,
+      "input_tokens": 1396,
+      "output_tokens": 1809,
+      "truncated": false,
+      "retry": false
+    },
+    {
+      "seconds": 20.96,
+      "input_tokens": 1328,
+      "output_tokens": 1712,
+      "truncated": false,
+      "retry": false
+    }
+  ],
+  "failure_details": [],
+  "tokens_per_item": 259.1,
+  "counterparty_failures_sample": []
+}

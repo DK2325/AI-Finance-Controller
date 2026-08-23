@@ -306,3 +306,36 @@ def test_a_model_that_obeys_the_attacker_changes_nothing_structural() -> None:
         "id", "counterparty_name", "payment_method", "utr",
         "reference_number", "parse_confidence",
     }
+
+
+def test_a_whitespace_stall_is_named_as_one_not_as_a_truncation() -> None:
+    """Measured on the live endpoint: 23,973 chars returned, 23,780 of them whitespace.
+
+    Constrained decoding can get stuck emitting spaces and newlines. That is legal JSON
+    whitespace, so the grammar is never violated and the decoder never advances -- it just
+    consumes the whole token budget. Distinct from an honest overrun because the remedy is
+    different: a bigger budget fixes a real truncation and merely costs more on a stall.
+    """
+
+    class Stalling(MockProvider):
+        def complete(self, request):
+            content = '{\n  "results": [\n    {\n      "id": "EX0001",' + " \n" * 9000
+            return LLMResponse(
+                text=content.strip(), raw_chars=len(content), truncated=True,
+                model="mock-1", provider="mock", output_tokens=8000,
+            )
+
+    result = run_job("parse", ROWS, provider=Stalling())
+    assert {o.reason_code for o in result.outcomes} == {ReasonCode.LLM_MALFORMED_RESPONSE}
+    assert all("decoder stalled" in o.detail for o in result.outcomes)
+    assert all("whitespace" in o.detail for o in result.outcomes)
+
+
+def test_an_honest_overrun_is_not_reported_as_a_stall() -> None:
+    """A real truncation fills its budget with content, so raw length tracks the tokens."""
+    content = '{"results": [' + '{"id": "EX0001", "counterparty_name": "ACME"},' * 200
+    response = LLMResponse(
+        text=content, raw_chars=len(content), truncated=True,
+        model="m", provider="p", output_tokens=8000,
+    )
+    assert not response.stalled

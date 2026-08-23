@@ -1,0 +1,15 @@
+{
+  "model": "nvidia/nemotron-3-super-120b-a12b",
+  "output_tokens": 8000,
+  "chars": 193,
+  "truncated": true,
+  "ids_emitted": 1,
+  "ids_sent": 20,
+  "most_repeated_ids": [
+    [
+      "EX0020",
+      1
+    ]
+  ],
+  "text": "{\n  \"results\": [\n    {\n      \"id\": \"EX0020\",\n      \"counterparty_name\": \"CALICUT CABLES  PRIVATE LIMITED\",\n      \"payment_method\": \"rtgs\",\n      \"utr\": \"300000003199\",\n      \"reference_number\":"
+}

@@ -120,6 +120,22 @@ class LLMResponse:
     # malformed output, but the fix is a token budget rather than a prompt change, and
     # one "malformed" bucket covering both sends you looking in the wrong place.
     truncated: bool = False
+    # Length of the response BEFORE stripping. Recorded because stripping it away is how
+    # a whitespace stall was misdiagnosed once already: constrained decoding can get stuck
+    # emitting spaces and newlines -- legal JSON whitespace, so the grammar is never
+    # violated and the decoder never advances -- and `.strip()` erases every trace of it.
+    # A measured 23,780 whitespace characters looked like "8,000 tokens produced 193
+    # chars", which sent the diagnosis somewhere it had no business going.
+    raw_chars: int = 0
+
+    @property
+    def stalled(self) -> bool:
+        """Whether the budget went on whitespace rather than on an answer.
+
+        Distinguishable from an honest overrun: a real truncation fills its budget with
+        content, so raw length tracks token count. A stall does not.
+        """
+        return self.truncated and self.raw_chars > len(self.text) * 2 + 1000
 
     def as_audit_fields(self) -> dict:
         return {
@@ -530,8 +546,10 @@ class NvidiaProvider:
 
             choice = response.choices[0]
             usage = response.usage
+            raw = choice.message.content or ""
             return LLMResponse(
-                text=(choice.message.content or "").strip(),
+                text=raw.strip(),
+                raw_chars=len(raw),
                 model=self.model,
                 provider=self.name,
                 input_tokens=getattr(usage, "prompt_tokens", 0) or 0,

@@ -1,0 +1,39 @@
+{
+  "model": "nvidia/nemotron-3-super-120b-a12b",
+  "repeats": 3,
+  "arms": {
+    "homogeneous": {
+      "rows": 20,
+      "batches_per_run": 1,
+      "first_attempt_calls": 3,
+      "truncated_calls": 3,
+      "truncation_rate": 1.0,
+      "items_failed_after_retry": 60,
+      "median_output_tokens_per_item": 400.0,
+      "max_output_tokens_per_item": 400.0,
+      "median_seconds": 155.6
+    },
+    "diversified": {
+      "rows": 20,
+      "batches_per_run": 1,
+      "first_attempt_calls": 3,
+      "truncated_calls": 2,
+      "truncation_rate": 0.667,
+      "items_failed_after_retry": 0,
+      "median_output_tokens_per_item": 400.0,
+      "max_output_tokens_per_item": 400.0,
+      "median_seconds": 97.8
+    },
+    "halved": {
+      "rows": 20,
+      "batches_per_run": 2,
+      "first_attempt_calls": 3,
+      "truncated_calls": 3,
+      "truncation_rate": 1.0,
+      "items_failed_after_retry": 60,
+      "median_output_tokens_per_item": 800.0,
+      "max_output_tokens_per_item": 800.0,
+      "median_seconds": 136.0
+    }
+  }
+}

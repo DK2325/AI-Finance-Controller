@@ -88,6 +88,10 @@ class Usage:
     cached_input_tokens: int = 0
     cached_output_tokens: int = 0
     seconds: float = 0.0
+    # One entry per real call. Latency and output size vary enormously between batches,
+    # and an average hides which batch was the expensive one -- which is the batch that
+    # explains a truncation.
+    call_log: list[dict] = field(default_factory=list)
 
     def record(self, response: LLMResponse, retry: bool = False) -> None:
         if response.cache_hit:
@@ -96,6 +100,13 @@ class Usage:
             self.cached_output_tokens += response.output_tokens
             return
         self.calls += 1
+        self.call_log.append({
+            "seconds": round(response.seconds, 2),
+            "input_tokens": response.input_tokens,
+            "output_tokens": response.output_tokens,
+            "truncated": response.truncated,
+            "retry": retry,
+        })
         self.retries += int(retry)
         self.input_tokens += response.input_tokens
         self.output_tokens += response.output_tokens
@@ -281,11 +292,18 @@ def _decode(response: LLMResponse, model_cls: type) -> tuple[Any | None, ReasonC
     try:
         payload = json.loads(response.text)
     except json.JSONDecodeError as exc:
-        detail = (
-            f"truncated at {len(response.text)} chars"
-            if response.truncated
-            else str(exc)[:160]
-        )
+        if response.stalled:
+            # Constrained decoding got stuck emitting legal JSON whitespace. Named
+            # precisely, because the remedy is a schema change and not a bigger budget --
+            # a stall consumes whatever budget it is given.
+            detail = (
+                f"decoder stalled: {response.raw_chars - len(response.text)} chars of "
+                f"whitespace after {len(response.text)} chars of content"
+            )
+        elif response.truncated:
+            detail = f"truncated at {len(response.text)} chars of content"
+        else:
+            detail = str(exc)[:160]
         return None, ReasonCode.LLM_MALFORMED_RESPONSE, detail
 
     try:

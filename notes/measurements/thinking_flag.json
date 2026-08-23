@@ -1,0 +1,19 @@
+[
+  {
+    "label": "attempt 1",
+    "rows": 20,
+    "enable_thinking_sent": false,
+    "max_tokens": 8000,
+    "finish_reason": "length",
+    "completion_tokens": 8000,
+    "content_chars": 23973,
+    "reasoning_chars": 0,
+    "message_keys": [
+      "content",
+      "role"
+    ],
+    "reasoning_head": "",
+    "content_tail": "   \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n     \n",
+    "whitespace_tail_chars": 23780
+  }
+]
