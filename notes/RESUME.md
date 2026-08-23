@@ -6,7 +6,7 @@ Last updated 23 Aug 2026, end of Phase 5. Read this first when picking the build
 
 ## Where the build is
 
-**Phases 0–5 complete.** Phase 6 is next: API, frontend, chaos mode.
+**Phases 0–6 complete.** Phase 7 is next: scale, the sealed test set, failure analysis.
 
 | phase | state |
 |---|---|
@@ -16,8 +16,8 @@ Last updated 23 Aug 2026, end of Phase 5. Read this first when picking the build
 | 3 blocking, exact + fuzzy matching, features | ✅ |
 | 4 classifier, calibration, operating point | ✅ tagged `v1-working` |
 | 5 LLM exception layer + audit trail | ✅ see notes/phase-5-report.md |
-| **6 API, frontend, chaos mode** | **← next** |
-| 7 sealed test set, failure analysis | — |
+| 6 API, frontend, chaos mode | ✅ see notes/phase-6-report.md |
+| **7 scale, sealed test set, failure analysis** | **← next** |
 | 8 README, video, rehearsal | — |
 
 ## Carried into Phase 6 and 7 — read notes/phase-5-report.md
@@ -91,27 +91,34 @@ tests                  489 passing, ruff clean
   `python -c "from ledgerloop.config import key_fingerprint; print(key_fingerprint())"`
 - venv at `venv/`, Python 3.12.10, all dependencies installed
 - Docker Desktop must be **running** for anything touching Compose
-- Repo is pushed and clean; `origin/main` at `d093ef1`
+- Repo is pushed and clean
+- **Live:** https://ai-finance-controller-production.up.railway.app
+  (`database: true`, `llm: live`; redeploys on push to main)
+- Locally: `docker compose up`, then http://localhost:3000 — two services, one image,
+  no `.env` required
 
 ## To resume
 
 Activate the venv and say:
 
-> **"Read notes/RESUME.md and notes/phase-5-report.md, then start Phase 6."**
+> **"Read notes/RESUME.md and notes/phase-6-report.md, then start Phase 7."**
 
 That is enough. Everything decided is written down in `notes/`.
 
 ---
 
-## Phase 5 is closed
+## Phases 5 and 6 are closed
 
-`notes/phase-5-report.md` has the exit criteria, the measurements, the explanation
-checkpoint, and the three things Phase 6 and 7 must not re-derive. The step-by-step plan
-that used to live here is history now and lives in git.
+`notes/phase-5-report.md` and `notes/phase-6-report.md` carry the exit criteria, the
+measurements, and the things Phase 7 must not re-derive.
 
-**Phase 6 is different work: assembly, not investigation.** The engine is built. If Phase 6
-starts turning up findings at Phase 5's rate, that is a signal the approach is wrong rather
-than a good sign — what is left is making the thing visible.
+**Phase 6 was assembly, and it still turned up four defects** — three of them reachable only
+from a real host, and one a cold `docker compose up` that had stopped building entirely.
+None was a mistake in new code. All four were about paths that had stopped being exercised.
+
+**Phase 7 is measurement, and the seal is the point.** Break it once, record what it says,
+and do not retune against it. The most credible number in the submission is credible
+precisely because nothing was tuned to produce it.
 
 ---
 

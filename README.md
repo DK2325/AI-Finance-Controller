@@ -527,6 +527,59 @@ Full analysis and the reasoning trail, including the correction: `notes/injectio
 **Live:** https://ai-finance-controller-production.up.railway.app — seeded with a completed
 run, so it has something to show on a cold start with no training and no database write.
 
+**Locally**, from a fresh clone:
+
+```
+docker compose up
+```
+
+Then open **http://localhost:3000** (8000 works too). Two services: Postgres, and one app
+container that serves both the API and the frontend.
+
+| | measured on a cold start |
+|---|---|
+| build from source, no cached layers | **29s** |
+| `docker compose up -d` on an empty volume | **10s** |
+| first answer from the web tier | **3s** |
+| **total, building from source** | **~42s** |
+| **total, with the image already built** | **13s** |
+
+Both are inside the 60 seconds this project holds itself to, but they are different
+experiences and quoting only the faster one would be misleading. A reviewer building from
+source waits about forty seconds; one who has the image waits thirteen.
+
+No `.env` is required. Without an API key the LLM layer runs in mock mode and every screen
+still works — the seeded run and the demo batch need no model at all.
+
+### The two run paths are one image
+
+`docker compose` and the hosted deployment build the **same `Dockerfile`**. That is not
+tidiness; it is a defect fix.
+
+There used to be two — one for compose, one for the host — and they had to be kept in sync
+by hand. A cold `docker compose up` from a fresh clone eventually stopped building
+entirely, in three separate ways at once, every one of them a fix that had been applied to
+the hosted image and not carried across.
+
+> **Nothing had broken. The two paths had simply stopped being the same thing, one correct
+> change at a time.**
+
+That is worth more than the bug it describes. Each individual change was right for the file
+it touched. Nobody was careless, and there was no moment at which someone decided not to
+update the other one. The hosted path was exercised several times a day; the documented one
+had not been run end to end in weeks — and **whichever path you run daily is the one that
+works. Any other path is a claim, and it decays silently from the moment it stops being
+exercised.**
+
+The response was not to be more careful. It was to delete the duplicate:
+
+> **Two things that must stay identical will not, unless something makes them the same
+> thing.** A test that fails on divergence is the weaker version of this; having one thing
+> is the stronger one. Prefer deleting the duplicate to synchronising it.
+
+Full account, including the two other places in this project where something claimed to
+match and did not: [notes/failure-modes.md](notes/failure-modes.md).
+
 ### Three deployment findings, and why they argue for deploying early
 
 None of the three below was reachable from local testing or from `docker compose`. All

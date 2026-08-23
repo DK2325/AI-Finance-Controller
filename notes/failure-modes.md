@@ -718,14 +718,30 @@ and hosted are now the same artifact running the same code**, and drift has nowh
 
 ### The same shape, for the third time
 
-| what claimed to match | what actually diverged | how it was caught |
-|---|---|---|
-| `resolve_indices` "mirrors model/predict.py exactly" | an unstable sort against a stable one — worth 17 points of coverage | reading the docstring next to the code |
-| `docker/api.Dockerfile` and the root `Dockerfile` | three fixes applied to one and not the other | running the cold path for the first time in weeks |
-| the mock provider and the real response shape | *designed against* — the mock walks the schema so it cannot fall behind | asking how the instrument would lie |
+| what claimed to match | what actually diverged | how it was caught | could it have been merged? |
+|---|---|---|---|
+| `resolve_indices` "mirrors model/predict.py exactly" | an unstable sort against a stable one — worth 17 points of coverage | reading the docstring next to the code | **no** |
+| `docker/api.Dockerfile` and the root `Dockerfile` | three fixes applied to one and not the other | running the cold path for the first time in weeks | **yes** |
+| the mock provider and the real response shape | *designed against* — the mock walks the schema so it cannot fall behind | asking how the instrument would lie | n/a — never duplicated |
 
 Two of the three were caught by luck. The third was caught by design, and it is the only
 one that could not have gone unnoticed.
+
+**The last column is the one that decides the fix, and the two cases genuinely differ.**
+
+`resolve_indices` takes `(list[dict], np.ndarray)` because it runs inside training over a
+scored matrix; `resolve` takes `list[ScoredCandidate]` because it runs at inference over
+objects. Merging them would mean one of the two callers marshalling its data into the
+other's shape on every call, in the hot path of both. So there the property test *is* the
+right answer — it is the strongest available response, not a weaker substitute for one.
+
+The two Dockerfiles had no such excuse. They described the same image for the same
+application and differed only in which paths they copied. Merging cost nothing and removed
+the failure mode rather than detecting it.
+
+> **Reach for the test when the duplication is forced. Reach for deletion when it is not —
+> and check which one you are looking at before deciding, because "add a test" is the
+> answer that always feels available.**
 
 > **Two things that must stay identical will not, unless something makes them the same
 > thing.** A test that fails on divergence is the weaker version of this; having one thing
