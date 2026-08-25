@@ -1078,6 +1078,36 @@ would have moved.** An abstention has a denominator too.
 
 ---
 
+## Where the findings in this document actually came from
+
+Worth separating, because the three sources are not equally available and only two of them
+can be planned for.
+
+| how it arrived | examples | can you go looking for it? |
+|---|---|---|
+| **a better question was asked** | the regex-dominance test, reason-code actionability scored against ground truth, "what happens to the candidates on the row we excluded?" | **yes** — this is most of the document |
+| **change exposed a latent defect** | `.gitignore` refusing a new directory, the reproducibility test on a busier machine | **no, but you can wait** — change arrives on its own |
+| **an accident happened to be observed** | the half-open socket | **no** |
+
+**The third one is the uncomfortable category.** The connect-timeout defect was not found by
+asking anything. A stale port-forward happened to exist, on a machine that happened to be
+running a test suite, during the verification of a completely unrelated fix. Remove any one
+of those and it is still sitting in `ledgerloop/db.py`, waiting for the managed host where
+half-open failures are most likely.
+
+**And it was one keystroke from being lost.** The observable symptom was *the test suite is
+being slow today*. The natural, almost automatic response to that is to run it again — and
+running it again would have produced the same slowness, attributed to the same nothing, and
+the defect would have survived being looked directly at. Twice.
+
+So the only practical form of this is a disposition rather than a method: **when something
+is behaving oddly during work that has nothing to do with it, the oddity is the finding.**
+Not a distraction from the task, and not something to route around until the task is done.
+There is no procedure that generates these, which is precisely why the ones that turn up
+should not be spent.
+
+---
+
 ## When a number can be derived or counted, count it
 
 Three instances now, and they are the same mistake wearing different clothes. Each time a
@@ -1266,6 +1296,14 @@ second one was harder to see precisely because the first had just been fixed —
 > **A duplicate removed is not a duplicate class removed.** Ask again at the next layer
 > down: same image, same code, same command, same environment. The one that bites is the
 > one below wherever you stopped looking.
+
+**And the second one was hidden by the first being fixed.** "Are these two paths the same?"
+had been asked, investigated, answered, written up and closed. Everything about that was
+done well, and it is exactly what made the entrypoint invisible: nobody re-opens a question
+that has a good answer attached to it, least of all the person who just answered it.
+
+> **A resolved question is a place things hide.** Not an unasked question — a *resolved*
+> one. The unasked question is at least still open.
 
 #### Two instruments behaved well, and both were built for this
 

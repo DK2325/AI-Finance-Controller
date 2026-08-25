@@ -281,8 +281,17 @@ body {
 .ev-card { border: 1px solid var(--line); border-radius: 8px; padding: 13px; background: #fcfcfd; }
 .ev-card h4 { margin: 0 0 9px; font-size: 11.5px; text-transform: uppercase;
   letter-spacing: .05em; color: var(--ink-3); font-weight: 600; }
-.ev-card.absent { background: #fdf6f5; border-color: #f0cdc9; }
-.ev-card.absent p { margin: 0; font-size: 13.5px; color: #7a1c16; }
+/* Amber, not red. An absent bank credit or invoice is the SYSTEM WORKING -- blocking
+   retrieved nothing and the queue is saying so -- and the card's own copy says exactly
+   that: "the finding is the absence, not a gap in this screen". Red said the opposite
+   before the sentence was read, and colour is read first. Amber marks it as something to
+   look at; red marks it as something that went wrong, and nothing did. */
+.ev-card.absent {
+  background: #fffaf2;
+  border-color: #f0dcc0;
+  border-left: 3px solid var(--warn);
+}
+.ev-card.absent p { margin: 0; font-size: 13.5px; color: #7a4a12; }
 .ev-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px;
   padding: 3px 0; border-bottom: 1px dashed #edf0f4; }
 .ev-row:last-child { border-bottom: 0; }

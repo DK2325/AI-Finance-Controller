@@ -231,8 +231,8 @@ on data/train, for comparison
 
 cold clone             165s build --no-cache, 9s up, 3s first answer  (was claimed 29s)
                        10s total with the image already built
-live site              schema was ABSENT until fixed; needs a redeploy to pick it up
-                       check /health reports schema: ready before recording
+live site              schema fixed and REDEPLOYED; confirmed storing to postgres,
+                       six tables present, footer shows v1-test / data/test
 throughput             105 settlements/s at 24,750 rows, AMD Ryzen 5 5600H, six cores
                        reason job 10.1 rpm; parse 27.2 rpm -- quote the job, not "the" rate
 tests                  526 passing in ~55s, ruff clean
@@ -317,14 +317,23 @@ That is enough. Everything decided is written down in `notes/`.
    exists to make. `connect_timeout` and `pool_timeout` are now set, and `/health` makes
    one connection attempt instead of two. **The suite runs in 57 seconds.**
 
-**Left:**
+7. **Review-queue empty states were red.** `.ev-card.absent` -- shown when blocking
+   produced no bank candidate, or no invoice could be named -- used a red tint, while the
+   card's own copy said *"the finding is the absence, not a gap in this screen"*. Colour is
+   read before text, so it said error where nothing had gone wrong. Amber now, with a
+   `--warn` left border. The genuinely red states are untouched: `.chaos-verdict.fail`, and
+   the `#cliff` banner that fires only when precision drops below the 99.5% floor.
 
-7. **Video and rehearsal.** The human's own work.
-8. **The last deletion.** `notes/RESUME.md` (this file) and `notes/conventions.md`, after
+**Left -- all of it the human's own work:**
+
+8. **Video and rehearsal.**
+9. **The unit-economics paragraph.** The data is measured and in the README; the written
+   interpretation is deliberately not written, per BUILD.md.
+10. **The last deletion.** `notes/RESUME.md` (this file) and `notes/conventions.md`, after
    the video. Before deleting RESUME.md, rewrite the two citations to it in
    `notes/injection.md`, which quotes it as the source of a claim it then corrects.
    `BUILD.md` stays — see above.
-9. **Flip the repo public.** It is private; a panel cannot see a private repo.
+11. **Flip the repo public.** It is private; a panel cannot see a private repo.
 
 **Decided and not to be revisited:** the ~78 backward-looking `Phase N` references in the
 kept notes stay. They resolve to numbered sections of BUILD.md rather than to a calendar,

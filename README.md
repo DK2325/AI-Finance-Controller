@@ -725,11 +725,16 @@ The response was not to be more careful. It was to delete the duplicate:
 Full account, including the two other places in this project where something claimed to
 match and did not: [notes/failure-modes.md](notes/failure-modes.md).
 
-### Three deployment findings, and why they argue for deploying early
+### What deploying early found, and what deploying was not enough to find
 
-None of the three below was reachable from local testing or from `docker compose`. All
-three were found within an hour of having a real host, and each one would have been found
-in front of a panel instead.
+None of the first three below was reachable from local testing or from `docker compose`.
+All three were found within an hour of having a real host, and each one would otherwise
+have been found in front of a panel.
+
+**The fourth is the interesting one, because deploying did not find it.** It sat behind
+three green checks on a running deployment and took a human clicking a button in the
+product. Having a host is necessary and it is not sufficient: a path nobody walks is a
+path nobody has tested, and that is as true of a deployed path as of a documented one.
 
 **1. The driver prefix.** Managed Postgres providers inject `DATABASE_URL` as
 `postgresql://…` (Railway, Render) or the legacy `postgres://…`. SQLAlchemy reads that
@@ -762,6 +767,50 @@ A missing shared library now fails the **build**, not a screen. `/health/native`
 the same check on a running container.
 
 *(It caught a bug in itself on first run, which is the behaviour you want from a check.)*
+
+### A fourth, found by clicking a button, and the two instruments it graded
+
+The three above were found within an hour of having a real host. This one survived every
+one of those checks, and was found by a human approving an exception on the live site:
+
+```
+Recorded as escalated by dushyant -- stored in file,
+postgres schema mismatch (ProgrammingError) -- migrations may not have run;
+appended to approvals.jsonl
+```
+
+**The hosted database had no tables in it.** Migrations ran in a start-up script that only
+`docker compose` invoked; the deployment ran the image's own command and applied nothing.
+So the append-only Postgres audit trail this README claims was, on the live site, a file.
+
+**One instrument did well, and it was built for exactly this.** The message says *schema
+mismatch* and names migrations — not *postgres unreachable*. That distinction exists
+because an earlier version said "unreachable" for every failure and once sent an
+investigation to the wrong place while Postgres was up and a foreign key was doing its job.
+It had only ever been exercised against fixtures. **On its first real production failure it
+named the cause precisely enough that the fix was found without reading a log**, and the
+fallback meant the approval was still recorded rather than dropped.
+
+**One did badly, and it is the one everybody looks at.** `/health` reported
+`database: true` throughout. That was *correct* — the connection worked. `SELECT 1` proves
+a connection and says nothing about whether any table this application writes to exists, so
+a green check sat in front of a database that could not accept a single audit record.
+`database` and `schema` are two claims; they are two fields now.
+
+**Then verifying the fix found something worse than the fix.** A stale port-forward left by
+a stopped container was *accepting* connections to a database that no longer existed, and
+the engine had no connect timeout — so `/health` waited on a server that would never
+answer. Refused fails in milliseconds, unreachable fails when the OS gives up, and
+**half-open never fails at all**. Every deployment failure this project had seen was one of
+the first two, which is why it had never been felt; the third is more likely on a managed
+host than on a laptop.
+
+> **A health check that can hang is not a health check.** It converts a degraded dependency
+> into an unresponsive service, which is the one distinction it exists to make.
+
+Bounded now, and `/health` makes one connection attempt rather than two — it was asking
+twice, paying two full timeouts to report something one connection establishes. Full
+account in [notes/failure-modes.md](notes/failure-modes.md).
 
 ### CLI
 
