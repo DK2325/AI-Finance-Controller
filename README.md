@@ -811,13 +811,45 @@ enforced by `tests/test_import_lint.py`, which fails the build on a breach.
 - **Money is `NUMERIC(14,2)`.** Never float. `tests/test_no_float_money.py` walks the
   schema and fails the build if a float column ever appears.
 - **`audit_records` is append-only.** No update or delete path exists in code, and a
-  Postgres trigger raises on UPDATE or DELETE so the guarantee holds against raw SQL.
+  Postgres trigger raises on UPDATE or DELETE so the guarantee holds against raw SQL —
+  checked by issuing both against a running database rather than by reading the migration:
+
+  ```
+  update audit_records set approver = 'someone else';
+  ERROR:  audit_records is append-only: UPDATE is not permitted on this table
+
+  delete from audit_records;
+  ERROR:  audit_records is append-only: DELETE is not permitted on this table
+  ```
+
+  **This claim was false on the live deployment until it was tested.** Migrations ran in a
+  start-up script that only `docker compose` invoked, so the hosted database was reachable
+  and empty and approvals fell through to the file store; `/health` reported
+  `database: true` throughout, because `SELECT 1` proves a connection and says nothing
+  about a schema. Both are fixed — the application applies migrations on start in every run
+  path, and `/health` reports `schema` beside `database`. The full account, including the
+  three instruments that behaved well during it, is in
+  [notes/failure-modes.md](notes/failure-modes.md).
 
 ## What it gets wrong
 
 The full list, with the evidence for each, is
 [notes/failure-modes.md](notes/failure-modes.md). Four entries belong here because a
 reviewer should not have to find them.
+
+**One line from that document generalises past this project, and it is the shortest
+statement of what every entry in it has in common:**
+
+> **A rate is not a result until its denominator is quoted beside it, and a denominator of
+> zero is not the absence of failures — it is the absence of a result.**
+
+It is written down because it was nearly violated in this README. The provenance gate's
+record on the sealed set reads *3,343 items, 0 failed* — over **0 fields checked**, because
+the only model job that ran there extracts no fields. *"Re-measured on held-out data, 0%
+provenance failure over 3,343 items"* would have been literally true and completely empty,
+and it is the kind of sentence nobody queries, because the number is exactly what a reader
+hopes to see. Almost every entry in the failure list is a version of this: a correct
+instrument, a correct number, and a question it was never answering.
 
 ### It cannot reconcile a netted refund, at all
 

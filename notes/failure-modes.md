@@ -1031,9 +1031,9 @@ faithfully. Only one of the two was ever going to be read, because a rate is wha
 came looking for.
 
 > **A rate is not a result until its denominator is quoted beside it, and a denominator of
-> zero is not a good result — it is the absence of one.** Rates are the shape a number
-> takes when it is about to be trusted, which is exactly when the count underneath it stops
-> being looked at.
+> zero is not the absence of failures — it is the absence of a result.** Rates are the
+> shape a number takes when it is about to be trusted, which is exactly when the count
+> underneath it stops being looked at.
 
 ---
 
@@ -1221,3 +1221,159 @@ wrong for months while every individual thing about it was honest.
 The claim that survives, and is now measured rather than asserted: **a reviewer who has
 never seen this repository is running it about three minutes after typing `git clone`, and
 ten seconds after that on every subsequent start.**
+
+### And then the same thing again, one layer further in, found by a human clicking a button
+
+Approving an exception on the live site returned this:
+
+```
+Recorded as escalated by dushyant -- stored in file,
+postgres schema mismatch (ProgrammingError) -- migrations may not have run;
+appended to approvals.jsonl
+```
+
+`/health` reported `database: true`. The hosted database had **no tables in it**.
+
+**The cause is the entrypoint, and it was a deliberate decision written down in the
+Dockerfile.** Migrations ran in `docker/entrypoint.sh`, which only `docker compose`
+invoked, through an `entrypoint:` override. The hosted deployment ran the image's own
+`CMD` and applied nothing. The comment beside it said why:
+
+> Railway's Postgres is managed and the demo reads runs from the filesystem, so a migration
+> failure there would take the service down for something no screen needs.
+
+**That is a good argument about every screen that reads, and the review queue writes.** The
+reasoning was sound and the inventory was incomplete — which is the same failure as the
+`0.945205` row in `notes/threshold.md`: nothing was hidden, nothing was miscounted, and the
+question being asked ("what do the screens need in order to render?") could not surface the
+one case that did not fit it.
+
+**What it cost is the worst part.** The README claims an append-only Postgres audit trail
+enforced by a database trigger. That claim was false in the only place a reviewer would
+check it, and it is load-bearing — an audit trail is the thing a finance panel asks about.
+
+#### Merging the two Dockerfiles was reported as finished, and it was not
+
+The entry above this one ends: *"Local and hosted are now the same artifact running the
+same code, and drift has nowhere to live."* Both halves of that sentence were true. The
+artifact was identical and the code was identical.
+
+**The invocation was not**, and nothing in "same artifact, same code" covers how the
+process is started. Deleting the duplicated *image* left a duplicated *entrypoint*, and the
+second one was harder to see precisely because the first had just been fixed — the question
+"are these two paths the same?" had been asked, answered yes, and closed.
+
+> **A duplicate removed is not a duplicate class removed.** Ask again at the next layer
+> down: same image, same code, same command, same environment. The one that bites is the
+> one below wherever you stopped looking.
+
+#### Two instruments behaved well, and both were built for this
+
+**The reason classifier earned its keep on a failure nobody constructed.** It said *schema
+mismatch, migrations may not have run* — not *postgres unreachable*. The distinction exists
+because the first version of that code said "unreachable" for every exception and sent an
+investigation to the wrong place while Postgres was up and a foreign key was doing its job.
+It had only ever been exercised against fixtures. **This is the first time it classified a
+real production failure, and it named the cause precisely enough that the fix was found
+without a single log being read.**
+
+**The fallback meant nothing was lost.** The approval was recorded to the append-only file
+beside the run and the response said which store took it. A demo that silently dropped a
+human decision would have been the worse failure, and refusing the decision would have made
+the screen unusable. Saying which store holds it was the right third option, and it held.
+
+#### And one instrument reported green on a question nobody asked
+
+`/health` ran `SELECT 1` and returned `database: true`. **That was correct.** The
+connection worked, the credentials were right, the driver prefix normalisation from the
+deployment findings above was doing its job. `SELECT 1` proves a connection and says
+nothing whatever about whether any table this application writes to exists.
+
+So the health endpoint sat green for as long as the defect lived, in front of a database
+that could not accept a single audit record. It belongs with the guards above and with
+every error message in the first half of this document: **a correct instrument, correctly
+reporting, answering a question that was not the one being asked of it.** A connection and
+a schema are two claims. They are now two fields, and `/health` reports `schema: ready`,
+`missing` or `unknown` beside the connection.
+
+#### The fix deletes the duplicate rather than synchronising it
+
+Migrations run in `api.main`, on start, in both paths — because both paths run the same
+image and now also run the same code to start it. `docker/entrypoint.sh` is gone and the
+compose override with it.
+
+**Non-fatal, which keeps the property the original decision was protecting.** A migration
+failure is recorded and served on `/health` rather than raised. The service still comes up
+with Postgres broken, and now says so specifically instead of reporting a healthy
+connection to an empty database. The original concern was legitimate; it was the conclusion
+drawn from it that was too narrow.
+
+Verified against a genuinely empty database — the state the live site was actually in:
+
+```
+/health          database: true   schema: ready   migrations: applied
+tables           alembic_version, approvals, audit_records, exceptions,
+                 model_versions, runs
+trigger          trg_audit_records_append_only
+UPDATE           ERROR: audit_records is append-only: UPDATE is not permitted
+DELETE           ERROR: audit_records is append-only: DELETE is not permitted
+approval         stored_in: postgres -- "append-only, enforced by a trigger"
+fallback file    not created; Postgres took it
+```
+
+The append-only claim in the README is now demonstrated rather than asserted, including the
+half that matters: **the trigger refuses, rather than the application declining to ask.**
+
+Two regression guards exist, and both were checked by reintroducing the defect and watching
+them go red: one fails if an entrypoint script or a compose `entrypoint:` override comes
+back, and one fails if `apply_migrations` exists but nothing calls it at start-up — which
+is the same defect wearing a different shape.
+
+#### Verifying that fix surfaced a worse one, in the health check itself
+
+The test suite stopped finishing. Not failing — **stopping**, at the same point every time,
+with no error and no timeout.
+
+The cause was not the change. `docker compose down` had left a stale port-forward on 5432
+that **accepted** connections to a database that no longer existed, and `create_engine`
+carried no connect timeout. So libpq completed the TCP handshake, waited for a Postgres
+server that was never going to answer, and waited without a bound.
+
+**Three ways a database can be unavailable, and only one of them hangs:**
+
+| | what the socket does | how long the caller waits |
+|---|---|---|
+| refused | RST, immediately | milliseconds |
+| unreachable | no route, eventually errors | seconds, bounded by the OS |
+| **half-open** | **accepts, then silence** | **forever** |
+
+Every previous deployment failure in this project was one of the first two, which is why
+this had never been felt. A stale forward, a firewall that drops rather than rejects, a
+load balancer in front of a dead backend, a container that has exited while its published
+port lingers — all produce the third, and all of them are *more* likely on a managed host
+than on a laptop.
+
+> **A health check that can hang is not a health check.** It converts a degraded dependency
+> into an unresponsive service — which is the single distinction it exists to make. `/health`
+> answering `database: false` in five seconds is the product working. `/health` never
+> answering is the product down, for a reason that had nothing to do with the product.
+
+`connect_args={"connect_timeout": 5}` bounds the TCP connect and the startup handshake
+together, which is what makes it cover the half-open case rather than only the first two.
+`pool_timeout` is bounded for the same reason: pool exhaustion under load should surface as
+an error rather than as a request that never returns.
+
+**And the endpoint was asking twice.** `/health` opened one connection to run `SELECT 1`
+and a second to ask whether the tables existed — two questions, two round trips, and
+against a database that is not answering, *two* connect timeouts. Twenty seconds to report
+a fact that one connection establishes. It makes a single attempt now and reads both
+answers from it, with a test asserting the connection is reused rather than trusting the
+timing to reveal it if it is not.
+
+**What this one has that the others do not is that it was never going to be found by
+reading.** The entrypoint defect was visible in two files that anyone could compare. The
+timing table was checkable by anyone who ran a build. This needed a peer that behaved in a
+specific wrong way, at a moment when something was watching — and what was watching was the
+verification of an unrelated fix. **Checking one thing properly is how the next thing gets
+found**, which is an argument for verifying rather than asserting that has nothing to do
+with the thing being verified.

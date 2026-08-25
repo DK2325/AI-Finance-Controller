@@ -213,3 +213,121 @@ def test_a_run_over_a_non_held_out_batch_does_not_claim_to_be_held_out() -> None
     from api.service import dashboard, load_run
 
     assert dashboard(load_run("v1-train"))["provenance"]["held_out"] is False
+
+# --------------------------------------------------------------------- the schema
+
+
+def test_the_schema_is_applied_by_the_application_not_by_a_start_script(
+    dockerfile: str,
+) -> None:
+    """The defect: migrations ran in a script only `docker compose` invoked.
+
+    The hosted deployment ran the image's CMD, so the schema was never created. Postgres
+    was reachable and empty, /health reported `database: true`, and every approval on the
+    live site fell through to the file store while the README claimed an append-only
+    Postgres audit trail.
+
+    Nothing had broken. The two start paths had never been the same thing, and only one of
+    them was ever exercised -- the same shape as the two Dockerfiles before them. The fix
+    was to delete the duplicate rather than to synchronise it, so this asserts the
+    duplicate is gone rather than that the two agree.
+    """
+    assert "entrypoint.sh" not in dockerfile, (
+        "an entrypoint script is back. Migrations belong in the application, where both "
+        "run paths get them from the same image instead of from two files kept in step."
+    )
+    assert not (REPO_ROOT / "docker" / "entrypoint.sh").exists()
+
+    compose = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    assert "entrypoint:" not in compose, (
+        "compose overrides the entrypoint again. That override is what made the local "
+        "path work and hid that the hosted one did not."
+    )
+
+    main = (REPO_ROOT / "api" / "main.py").read_text(encoding="utf-8")
+    assert "def apply_migrations" in main
+    assert "lifespan=lifespan" in main, (
+        "apply_migrations exists but nothing calls it on start-up, which is the same "
+        "defect with a different shape."
+    )
+
+
+def test_a_migration_failure_cannot_stop_the_service_starting(monkeypatch) -> None:
+    """Non-fatal on purpose: that property is why the hosted path skipped migrations.
+
+    The original decision -- do not migrate on the host, a migration failure would take
+    the service down for something no screen needs -- was right about the screens and
+    wrong about the review queue. Keeping the property and fixing the gap means the
+    migration runs everywhere and reports rather than raises.
+    """
+    from api import main
+
+    def explode(*_args, **_kwargs):
+        raise RuntimeError("alembic fell over")
+
+    monkeypatch.setattr("alembic.command.upgrade", explode)
+    state, detail = main.apply_migrations()
+
+    assert state == "failed"
+    assert "RuntimeError" in detail and "alembic fell over" in detail
+
+
+def test_the_schema_check_asks_about_tables_not_about_the_connection(monkeypatch) -> None:
+    """`SELECT 1` was true against a database with no tables in it.
+
+    A correct check answering a question nobody was asking -- the same family as every
+    other entry in notes/failure-modes.md. `database` and `schema` are two claims, so
+    /health reports two fields, and a connected-but-empty database must read as `missing`
+    rather than as anything reassuring.
+
+    The connection is passed in, which is how /health calls it: both facts come from one
+    round trip, because against a database that is not answering every extra attempt costs
+    another connect timeout.
+    """
+    from api import main
+
+    assert main.WRITE_TABLES == ("runs", "audit_records")
+
+    class NoTables:
+        def has_table(self, _name: str) -> bool:
+            return False
+
+    monkeypatch.setattr(main, "inspect", lambda _bind: NoTables())
+    state, detail = main.schema_state(conn=object())
+
+    assert state == "missing", "a reachable database with no tables must not read as ready"
+    assert "runs" in detail and "audit_records" in detail
+
+
+def test_the_schema_check_does_not_open_a_second_connection(monkeypatch) -> None:
+    """Given a connection, it must use that one and not reach for the engine.
+
+    /health opened a second connection to answer its second question, which doubled the
+    wait against exactly the failure it exists to report on. This asserts the fix rather
+    than trusting the timing.
+    """
+    from api import main
+
+    def refuse() -> None:
+        raise AssertionError("schema_state opened its own connection despite being given one")
+
+    class AllTables:
+        def has_table(self, _name: str) -> bool:
+            return True
+
+    monkeypatch.setattr(main, "engine", refuse)
+    monkeypatch.setattr(main, "inspect", lambda _bind: AllTables())
+
+    assert main.schema_state(conn=object()) == ("ready", "")
+
+
+def test_health_reports_the_schema_beside_the_connection() -> None:
+    """A green /health must not be able to mean an empty database again."""
+    from fastapi.testclient import TestClient
+
+    from api.main import app
+
+    body = TestClient(app).get("/health").json()
+    for field in ("database", "schema", "schema_detail", "migrations"):
+        assert field in body, f"/health lost {field!r}"
+    assert body["schema"] in ("ready", "missing", "unknown")

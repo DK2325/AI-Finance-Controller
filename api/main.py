@@ -2,10 +2,18 @@
 
 WHAT THIS SERVES AND WHY IT IS ONE PROCESS
 
-The API also serves the static frontend. Locally, `docker compose up` still brings up
-three containers -- db, api, web -- because that is the documented run path and it works.
-Hosted, one service is cheaper, has one fewer thing to be down during a demo, and removes
-a cross-origin hop. The two paths are independent so neither can break the other.
+The API also serves the static frontend, in both run paths: `docker compose up` brings up
+two containers -- db and app -- and the hosted deployment runs the same image. One service
+is cheaper, has one fewer thing to be down during a demo, and removes a cross-origin hop.
+
+THE SCHEMA IS APPLIED HERE, NOT BY WHATEVER STARTED THE PROCESS
+
+Migrations used to run in a shell entrypoint that only `docker compose` used; the hosted
+deployment ran the image's own CMD and never applied them. Postgres was reachable and
+empty, `/health` said `database: true`, and every approval on the live site fell through to
+the file store. Nothing had broken -- the two start paths had simply never been the same
+thing. So there is one mechanism now, in the application, which both paths share by
+construction rather than by being kept in step.
 
 THE SEEDED RUN COMES FROM THE REPOSITORY
 
@@ -22,13 +30,15 @@ is the optimistic one -- the exact inversion of the truth.
 
 from __future__ import annotations
 
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from api.jobs import REGISTRY, Job
 from api.review import ACTIONS, decisions_for, evidence_for, record_decision
@@ -38,11 +48,86 @@ from ledgerloop import __version__
 from ledgerloop.config import llm_available, nvidia_model
 from ledgerloop.db import engine
 
-STATIC_DIR = Path(__file__).resolve().parent.parent / "web" / "static"
+ROOT = Path(__file__).resolve().parent.parent
+STATIC_DIR = ROOT / "web" / "static"
 DEMO_BATCH = "data/demo"
 DEMO_MODEL = "runs/_models/v1"
 
-app = FastAPI(title="LedgerLoop", version=__version__)
+log = logging.getLogger("ledgerloop.startup")
+
+# The tables an approval writes to. Checked by name rather than by asking Alembic which
+# revision it has stamped, because a stamped revision and an existing table are different
+# claims, and it was the second one that turned out not to hold.
+WRITE_TABLES = ("runs", "audit_records")
+
+# The start-up outcome, served on /health rather than only logged. A deployment problem
+# visible only in logs nobody reads is a deployment problem that persists.
+_STARTUP: dict[str, str] = {"migrations": "not attempted", "detail": ""}
+
+
+def apply_migrations() -> tuple[str, str]:
+    """Bring the schema to head. Returns (state, detail), and never raises.
+
+    NON-FATAL ON PURPOSE, WHICH KEEPS THE ORIGINAL DECISION RATHER THAN REVERSING IT
+
+    Migrations were deliberately not run on the hosted deployment, on the grounds that a
+    migration failure would take the service down for something no screen needs -- the demo
+    reads its runs from the filesystem. That reasoning was right about the screens and
+    wrong about the review queue, which writes.
+
+    So this keeps the property that decision was protecting: it runs on every start, and a
+    failure is recorded and served instead of raised. The service still comes up with
+    Postgres broken, and now says so specifically rather than reporting a healthy
+    connection to an empty database.
+
+    Idempotent: `upgrade head` on an already-current database is a no-op, so this is safe
+    on every container start rather than only the first.
+    """
+    try:
+        from alembic import command
+        from alembic.config import Config
+
+        cfg = Config(str(ROOT / "alembic.ini"))
+        # Absolute, because `script_location` in alembic.ini is relative and the working
+        # directory is not the same in every start path.
+        cfg.set_main_option("script_location", str(ROOT / "ledgerloop" / "migrations"))
+        command.upgrade(cfg, "head")
+        return "applied", ""
+    except Exception as exc:  # noqa: BLE001 - a start-up failure must not stop the start-up
+        return "failed", f"{type(exc).__name__}: {exc}"[:300]
+
+
+def schema_state(conn=None) -> tuple[str, str]:
+    """Whether the tables an approval writes to exist. A different claim from "connected".
+
+    Takes an open connection when the caller already has one. /health needs both facts and
+    they come from the same round trip, so opening a second connection to answer the second
+    question doubles the wait for no information -- and against a database that is not
+    answering, each extra attempt costs a full connect timeout.
+    """
+    try:
+        if conn is not None:
+            missing = [t for t in WRITE_TABLES if not inspect(conn).has_table(t)]
+        else:
+            with engine().connect() as opened:
+                missing = [t for t in WRITE_TABLES if not inspect(opened).has_table(t)]
+    except Exception as exc:  # noqa: BLE001
+        return "unknown", type(exc).__name__
+    if missing:
+        return "missing", f"absent: {', '.join(missing)}"
+    return "ready", ""
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    state, detail = apply_migrations()
+    _STARTUP["migrations"] = state
+    _STARTUP["detail"] = detail
+    log.info("migrations %s%s", state, f" -- {detail}" if detail else "")
+    yield
+
+
+app = FastAPI(title="LedgerLoop", version=__version__, lifespan=lifespan)
 
 
 @app.get("/health/native")
@@ -61,22 +146,39 @@ def health_native() -> dict:
 
 @app.get("/health")
 def health() -> dict:
-    """Liveness plus a real database round-trip, so a green check means the stack works.
+    """Liveness, a database round-trip, and whether the schema an approval needs exists.
 
     `database: false` is reported rather than raised: the demo reads runs from the
     filesystem, so the product is usable with Postgres down, and a health endpoint that
     500s would take the whole service out for a dependency the screens do not need.
+
+    SCHEMA IS A SEPARATE FIELD BECAUSE `database` DID NOT MEAN WHAT IT LOOKED LIKE
+
+    `SELECT 1` proves a connection and says nothing about whether anything this application
+    writes will work. On the hosted deployment it returned true against a database with no
+    tables in it -- a correct check answering a question nobody was asking -- while every
+    approval in the review queue fell through to the file store. A connection and a schema
+    are two claims, so they are two fields.
     """
+    # One connection, both answers. A health endpoint that opens a second connection to
+    # answer its second question pays the connect timeout twice when the database is the
+    # thing that is wrong -- which is precisely when it is being called.
     try:
         with engine().connect() as conn:
             conn.execute(text("SELECT 1"))
-        db_ok = True
-    except Exception:
+            db_ok = True
+            schema, schema_detail = schema_state(conn)
+    except Exception as exc:  # noqa: BLE001
         db_ok = False
+        schema, schema_detail = "unknown", type(exc).__name__
     return {
         "status": "ok",
         "version": __version__,
         "database": db_ok,
+        "schema": schema,
+        "schema_detail": schema_detail,
+        "migrations": _STARTUP["migrations"],
+        "migrations_detail": _STARTUP["detail"],
         "llm": "live" if llm_available() else "mock",
         # Named, not just "configured". A vague status badge sitting beside a strong claim
         # invites the reader to doubt the claim; a model name is concrete and answerable.

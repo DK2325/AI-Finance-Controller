@@ -91,12 +91,12 @@ COPY data/test/ ./data/test/
 # shipped artifact is exactly the thing this project keeps refusing to make.
 RUN test -f ./data/test/.unsealed || (echo "data/test/.unsealed missing from image" && exit 1)
 
-# docker compose overrides the entrypoint with this to run migrations first. The hosted
-# deployment does not: Railway's Postgres is managed and the demo reads runs from the
-# filesystem, so a migration failure there would take the service down for something no
-# screen needs.
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+# There is no entrypoint script. There was one, invoked only by `docker compose`, which
+# ran migrations before serving; the hosted deployment ran the CMD below and never applied
+# them, so Postgres was reachable and empty and every approval on the live site fell
+# through to the file store. `api.main` applies migrations on start instead -- non-fatally,
+# which preserves the reason the hosted path skipped them in the first place -- so both run
+# paths get the schema from the same image rather than from two files kept in step.
 
 # Railway assigns $PORT and it is not 8000. Defaulted so the image also runs locally with
 # a bare `docker run`.

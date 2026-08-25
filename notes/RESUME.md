@@ -231,9 +231,11 @@ on data/train, for comparison
 
 cold clone             165s build --no-cache, 9s up, 3s first answer  (was claimed 29s)
                        10s total with the image already built
+live site              schema was ABSENT until fixed; needs a redeploy to pick it up
+                       check /health reports schema: ready before recording
 throughput             105 settlements/s at 24,750 rows, AMD Ryzen 5 5600H, six cores
                        reason job 10.1 rpm; parse 27.2 rpm -- quote the job, not "the" rate
-tests                  521 passing, ruff clean
+tests                  526 passing in ~55s, ruff clean
                        (was reported as 507; the count was partly luck, see
                         failure-modes.md "Guards that passed for the wrong reason")
 ```
@@ -289,14 +291,40 @@ That is enough. Everything decided is written down in `notes/`.
    nothing will ever surface it, and there is nothing to fix, because the instrument is
    correct.
 
+6. **A real defect on the live site, found by using it, fixed and verified.** Approving
+   an exception returned *"stored in file, postgres schema mismatch (ProgrammingError) --
+   migrations may not have run"*. Cause: migrations ran in `docker/entrypoint.sh`, invoked
+   only by compose's `entrypoint:` override; the hosted deployment ran the image's `CMD`
+   and applied nothing. Merging the two Dockerfiles removed the duplicated *image* and left
+   a duplicated *invocation*. Fixed by deleting the duplicate rather than synchronising it:
+   `api.main` applies migrations on start, non-fatally, in both paths. `/health` now
+   reports `schema` beside `database`, because `SELECT 1` was returning true against a
+   database with no tables in it. Verified from an empty database — six tables, the
+   append-only trigger refusing both UPDATE and DELETE, an approval returning
+   `stored_in: postgres`, no fallback file. Two regression guards, both checked by
+   reintroducing the defect.
+
+   **Note for the video:** the live site needs a redeploy for this to take effect there.
+   Confirm `/health` shows `schema: ready` before recording anything that touches the
+   review queue.
+
+   **Verifying that fix found a worse one.** The suite stopped finishing — not failing,
+   stopping. `docker compose down` had left a stale port-forward on 5432 that *accepted*
+   connections to a database that no longer existed, and `create_engine` had no connect
+   timeout, so `/health` waited on a server that was never going to answer. Refused is
+   fast, unreachable is bounded, **half-open hangs**, and a health check that can hang
+   converts a degraded dependency into an unresponsive service — the one distinction it
+   exists to make. `connect_timeout` and `pool_timeout` are now set, and `/health` makes
+   one connection attempt instead of two. **The suite runs in 57 seconds.**
+
 **Left:**
 
-6. **Video and rehearsal.** The human's own work.
-7. **The last deletion.** `notes/RESUME.md` (this file) and `notes/conventions.md`, after
+7. **Video and rehearsal.** The human's own work.
+8. **The last deletion.** `notes/RESUME.md` (this file) and `notes/conventions.md`, after
    the video. Before deleting RESUME.md, rewrite the two citations to it in
    `notes/injection.md`, which quotes it as the source of a claim it then corrects.
    `BUILD.md` stays — see above.
-8. **Flip the repo public.** It is private; a panel cannot see a private repo.
+9. **Flip the repo public.** It is private; a panel cannot see a private repo.
 
 **Decided and not to be revisited:** the ~78 backward-looking `Phase N` references in the
 kept notes stay. They resolve to numbered sections of BUILD.md rather than to a calendar,

@@ -60,9 +60,11 @@ services:
       NVIDIA_BASE_URL: ${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
       NVIDIA_MODEL: ${NVIDIA_MODEL:-nvidia/nemotron-3-super-120b-a12b}
       PORT: 8000
-    # Migrations first, then serve. Alembic's `upgrade head` is a no-op on an
-    # already-current database, so this is safe on every start rather than only the first.
-    entrypoint: ["/usr/local/bin/entrypoint.sh"]
+    # No entrypoint override. Migrations used to run in a shell script that only this
+    # path invoked; the hosted deployment ran the image's CMD and never applied them, and
+    # the divergence was invisible because compose was the path being tested. The
+    # application applies them on start now, so both paths get the schema by running the
+    # same image rather than by two files agreeing.
     ports:
       # 3000 as well as 8000, because BUILD.md and the README both say 3000 and a reviewer
       # who typed that should not meet a dead port.
