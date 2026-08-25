@@ -229,11 +229,13 @@ on data/train, for comparison
   precision            99.96%  (95% CI 99.77%-99.99%, 1 false in 2,497) at 0.9989
   deterministic share  51.06%   cost Rs 1.83 - Rs 3.03 per 1,000
 
+cold clone             165s build --no-cache, 9s up, 3s first answer  (was claimed 29s)
+                       10s total with the image already built
 throughput             105 settlements/s at 24,750 rows, AMD Ryzen 5 5600H, six cores
                        reason job 10.1 rpm; parse 27.2 rpm -- quote the job, not "the" rate
 tests                  521 passing, ruff clean
                        (was reported as 507; the count was partly luck, see
-                        failure-modes.md "Two guards that passed for the wrong reason")
+                        failure-modes.md "Guards that passed for the wrong reason")
 ```
 
 ## Environment: nothing to set up
@@ -273,17 +275,32 @@ That is enough. Everything decided is written down in `notes/`.
    so the first command a reviewer would copy did not run.
 3. **README read end to end.** Findings and fixes are listed below.
 
+4. **The cold clone check — done, and it found something.** `git clone` into a scratch
+   directory, `docker compose build --no-cache`, `up`, hit every endpoint. Everything
+   worked: two services, no `.env`, all ten native dependencies loading, frontend on 3000
+   and 8000, both seeded runs visible. **And the README's cold-start timing table was wrong
+   by 5.7×** — 165s to build from a fresh clone against a claimed 29s. Three of the five
+   rows were right; the two that were wrong were the two that require starting from
+   nothing, which is the condition nobody starts from twice. Corrected in the README and
+   recorded in `notes/failure-modes.md`.
+5. **The provenance finding is filed as a third guard**, and named as worse than the two
+   above it: those failed the moment they were finally asked to work, so change exposed
+   them. A job with no fields to check reports zero failures over any volume, forever —
+   nothing will ever surface it, and there is nothing to fix, because the instrument is
+   correct.
+
 **Left:**
 
-4. **A cold `docker compose up` from a fresh clone.** `notes/failure-modes.md` asks for this
-   explicitly and the reason is the strongest one in that document: the single-Dockerfile
-   path has been exercised exactly once. Docker Desktop was not running, so it is not done.
-5. **Video and rehearsal.** The human's own work.
-6. **Delete `BUILD.md`? No — see above.** Still to delete, at the very end:
-   `notes/RESUME.md` (this file) and `notes/conventions.md`. Before deleting RESUME.md,
-   rewrite the two citations to it in `notes/injection.md`, which quotes it as the source of
-   a claim it then corrects.
-7. **Flip the repo public.** It is private; a panel cannot see a private repo.
+6. **Video and rehearsal.** The human's own work.
+7. **The last deletion.** `notes/RESUME.md` (this file) and `notes/conventions.md`, after
+   the video. Before deleting RESUME.md, rewrite the two citations to it in
+   `notes/injection.md`, which quotes it as the source of a claim it then corrects.
+   `BUILD.md` stays — see above.
+8. **Flip the repo public.** It is private; a panel cannot see a private repo.
+
+**Decided and not to be revisited:** the ~78 backward-looking `Phase N` references in the
+kept notes stay. They resolve to numbered sections of BUILD.md rather than to a calendar,
+and a sweep is a large diff for no gain.
 
 ### What the README read-through found
 
@@ -378,7 +395,9 @@ documentation. Commit messages describe the change and the reasoning.
 - **Do not re-score `data/test` and do not retune against it.** It has been reported.
 - **Never commit `.env`.** `tests/test_secrets.py` fails the build if it is tracked, or
   if any tracked file grows a credential-shaped string.
-- **Docker Desktop must be running** for the cold-start check that is still outstanding.
+- **The cold clone check is not a one-off.** Run it again if the `Dockerfile` or
+  `docker-compose.yml` changes. A timing or a build that depends on what is *absent* from a
+  machine cannot be verified on the machine that has it.
 
 ## Where the reasoning lives
 

@@ -666,17 +666,32 @@ docker compose up
 Then open **http://localhost:3000** (8000 works too). Two services: Postgres, and one app
 container that serves both the API and the frontend.
 
-| | measured on a cold start |
+| | measured from a fresh `git clone` |
 |---|---|
-| build from source, no cached layers | **29s** |
-| `docker compose up -d` on an empty volume | **10s** |
+| `docker compose build --no-cache` | **165s** |
+| `docker compose up -d` on an empty volume | **7–9s** |
 | first answer from the web tier | **3s** |
-| **total, building from source** | **~42s** |
-| **total, with the image already built** | **13s** |
+| **total, first build from a fresh clone** | **~3 minutes** |
+| **total, with the image already built** | **10s** |
 
-Both are inside the 60 seconds this project holds itself to, but they are different
-experiences and quoting only the faster one would be misleading. A reviewer building from
-source waits about forty seconds; one who has the image waits thirteen.
+*AMD Ryzen 5 5600H, six cores, Docker 29.4.3 on Windows, domestic broadband — the same
+machine the throughput figures name. Two steps that are not this application account for
+131 of the 165 seconds: **87s downloading Python wheels** (numpy, scipy, pandas, polars,
+matplotlib, LightGBM) and **44s exporting a 1.27 GB image**. Both are network- and
+disk-bound, and neither is paid twice.*
+
+**These replace a table that claimed 29s to build and ~42s in total.** Those numbers are
+not reproducible from a fresh clone with `--no-cache`; the likeliest reading is that they
+were taken with the base image and dependency layers already present, which is a rebuild
+rather than a first build. They are corrected here and the correction is recorded in
+[notes/failure-modes.md](notes/failure-modes.md), because the discrepancy is the pattern
+that document is about — a number that was true of the measurement actually performed,
+labelled as one that was not.
+
+**So the 60-second bar this project holds itself to applies to the second run, not the
+first.** A reviewer who has never built it waits about three minutes, most of it watching
+pip. A reviewer who has the image waits ten seconds. Quoting only the second would be the
+misleading half, which is why both are here.
 
 No `.env` is required. Without an API key the LLM layer runs in mock mode and every screen
 still works — the seeded run and the demo batch need no model at all.

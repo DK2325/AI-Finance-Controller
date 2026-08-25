@@ -893,7 +893,7 @@ they were built to be capable of failing:
 
 ---
 
-## Two guards that passed for the wrong reason
+## Guards that passed for the wrong reason
 
 **A distinct category from the error messages above, and a worse one.** Those instruments
 *reported* wrongly, so anyone who read the output had a chance to notice. These behaved
@@ -901,9 +901,11 @@ exactly as intended while being broken, and produced the correct outcome for fiv
 by coincidence. **A guard that passes for the wrong reason is invisible until the reason
 changes**, and the reason is usually something nobody is watching.
 
-Both surfaced at Phase 7, neither by being looked for. A third defect of a different kind
-is recorded with them, because it was found in the same pass and makes the same point about
-small discrepancies being expensive out of proportion to their size.
+Both surfaced at Phase 7, neither by being looked for. Two further defects are recorded
+with them: one of a different kind, found in the same pass, which makes the same point
+about small discrepancies being expensive out of proportion to their size — and one at the
+end that is a guard of the same family and is worse than either, for a reason worth
+isolating.
 
 ### `.gitignore`: every exception was inert
 
@@ -982,6 +984,56 @@ the guard to do its job. Both were exposed by *change* — a new directory, a bu
 The practical form: **when a check has never failed, ask what would make it fail, and
 whether that has ever happened.** A green result from a check that has never been exercised
 is not evidence, and the count of passing tests is not either.
+
+### The third guard is worse than the pair, and the difference is the whole point
+
+Found while reading the README end to end, in a sentence promising a measurement that had
+never been taken. The README said the provenance gate would be re-measured on the sealed
+test set. A number was available and looked like exactly the right one:
+
+```json
+"provenance": {
+  "items": 3343,
+  "items_failed": 0,
+  "item_failure_rate": 0.0,
+  "fields_checked": 0
+}
+```
+
+**3,343 items. Zero failures. Zero fields checked.** The only LLM job that ran against the
+sealed set writes exception reasons; it extracts nothing, so the gate had nothing to
+verify. Writing *"re-measured on the sealed test set, 0% provenance failure over 3,343
+items"* would have been **literally true and entirely empty** — and the reason it is
+dangerous is that the number looks like precisely what anyone would hope to find. A
+perfect record, at five times the volume of the original measurement, from a job that
+extracts nothing.
+
+**Why this is worse than the two above, and not merely another instance.** Those two failed
+the moment they were finally asked to work: a new directory made `.gitignore` refuse an
+add, a busier machine made the reproducibility test go red. Change exposed them, because
+in both cases there was a real job the guard would eventually be handed and visibly fail.
+
+There is no such moment here. **A job with no fields to check will report zero failures
+over any volume, forever.** No future run makes `fields_checked: 0` fail; running it on ten
+times the data produces a rate ten times as reassuring and exactly as meaningless. The pair
+were latent — waiting for a trigger. This one is permanent, and nothing about the system
+will ever surface it.
+
+**And there is nothing to fix.** The instrument is correct: a job that extracts no fields
+*should* record no failures. `item_failure_rate: 0.0` is a true statement about the reason
+job. The defect is entirely in the reading — which puts this with the general finding
+below rather than with the broken guards above, and is why it went into the README as a
+stated absence rather than being quietly dropped.
+
+**The tell was in the record the whole time.** Both numbers are there: `items: 3343` and
+`fields_checked: 0`, four lines apart. The instrument reported its own denominator
+faithfully. Only one of the two was ever going to be read, because a rate is what someone
+came looking for.
+
+> **A rate is not a result until its denominator is quoted beside it, and a denominator of
+> zero is not a good result — it is the absence of one.** Rates are the shape a number
+> takes when it is about to be trusted, which is exactly when the count underneath it stops
+> being looked at.
 
 ---
 
@@ -1126,9 +1178,46 @@ the failure mode rather than detecting it.
 other path is a claim, and it decays silently from the moment it stops being exercised.
 
 Which makes the standing obligation on this repository specific rather than general: **the
-cold `docker compose up` from a fresh clone has now been exercised exactly once.** Once is
-enough to know it works today and not enough for it to stay a run path. It should be run
-again from a clone before anyone is invited to try it, and again whenever the image or the
-compose file changes — not because something is expected to break, but because the finding
-above is precisely that nothing breaks. Things stop being the same, one correct change at
-a time.
+cold `docker compose up` from a fresh clone must be run from a clone before anyone is
+invited to try it, and again whenever the image or the compose file changes** — not because
+something is expected to break, but because the finding above is precisely that nothing
+breaks. Things stop being the same, one correct change at a time.
+
+### The obligation was discharged, and it paid for itself immediately
+
+`git clone` into a scratch directory, `docker compose build --no-cache`, `up`, and hit every
+endpoint. **Everything worked.** Two services, no `.env` required, all ten native
+dependencies loading under `/health/native`, the frontend served on both 3000 and 8000, and
+both seeded runs visible — `v1-test` at 4,950 settlements, the held-out one the README
+reports.
+
+**And the README's timing table was wrong by 5.7×.**
+
+| | claimed | measured from a fresh clone |
+|---|---|---|
+| build, "no cached layers" | 29s | **165s** |
+| `up` on an empty volume | 10s | 7–9s |
+| first answer from the web tier | 3s | 3s |
+| **total, from source** | **~42s** | **~177s** |
+| total, image already built | 13s | 10s |
+
+**Three of the five rows were right.** The two that were wrong were the two that require
+starting from nothing — which is the condition nobody starts from twice. 87 of the missing
+136 seconds are pip downloading numpy, scipy, pandas, polars, matplotlib and LightGBM; 44
+are Docker exporting a 1.27 GB image. Neither is the application, and neither is paid again.
+
+**This is the same shape as everything else in this document.** Not a broken
+instrument: 29 seconds was almost certainly a real reading of a real build. It was a build with the base image and the dependency layers already sitting on
+the machine — which is a *rebuild*, and no flag on the command changes what was already
+present before it ran. The label said "no cached layers" and described an intention rather
+than a measured condition.
+
+**The rule it leaves is narrower than "measure your build" and more useful:** a timing that
+depends on what is *absent* from the machine cannot be verified on the machine that has it.
+The only place to measure a first build is somewhere that has never built it. That is the
+same argument as the sealed test set, applied to a stopwatch — and it is why the number was
+wrong for months while every individual thing about it was honest.
+
+The claim that survives, and is now measured rather than asserted: **a reviewer who has
+never seen this repository is running it about three minutes after typing `git clone`, and
+ten seconds after that on every subsequent start.**
