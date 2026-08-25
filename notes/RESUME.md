@@ -1,6 +1,6 @@
 # Resume here
 
-Last updated at the close of Phase 7. Read this first when picking the build back up.
+Last updated partway through Phase 8. Read this first when picking the build back up.
 
 ---
 
@@ -33,10 +33,10 @@ The two that catch people immediately:
 | 2 eval harness, risk–coverage curve | ✅ |
 | 3 blocking, exact + fuzzy matching, features | ✅ |
 | 4 classifier, calibration, operating point | ✅ tagged `v1-working` |
-| 5 LLM exception layer + audit trail | ✅ see notes/phase-5-report.md |
-| 6 API, frontend, chaos mode | ✅ see notes/phase-6-report.md |
+| 5 LLM exception layer + audit trail | ✅ report deleted; findings live in notes/failure-modes.md |
+| 6 API, frontend, chaos mode | ✅ report deleted; findings live in the README |
 | 7 scale, sealed test set, failure analysis | ✅ see notes/phase-7-report.md |
-| **8 README, video, rehearsal** | **← next** |
+| **8 README, video, rehearsal** | **← in progress** |
 
 ## Carried into Phase 8 — the short version
 
@@ -256,17 +256,56 @@ Activate the venv and say:
 
 That is enough. Everything decided is written down in `notes/`.
 
-### Phase 8, in the order it should be done
+### Phase 8
 
-1. **The cleanup list below.** Deleting files changes what a reviewer sees, so it happens
-   before anything is rehearsed against.
-2. **Decide the `difficulty` flag: wire it or drop it.** It is still a no-op that claims to
-   do something, which is the one defect in this repo that is a lie rather than a limit.
-   Dropping it is the cheap answer and BUILD.md does not require it.
-3. **README polish.** The numbers are correct and current as of the close of Phase 7; what
-   remains is reading it end to end as a stranger would, not re-deriving figures.
-4. **Video and rehearsal.**
-5. **Flip the repo public.** It is private; a panel cannot see a private repo.
+**Done:**
+
+1. **Cleanup, in part.** `BUILD.md` was stripped to the specification rather than deleted —
+   33 files cite it by name as the reason a rule exists, and orphaning 64 citations to
+   remove a calendar was the wrong trade. What went: the operating rules, the gate
+   ceremony, the dates, the schedule, the slip plan. What stayed: thesis, architecture
+   rules, data contracts, repository layout, database rules, out-of-scope, and the numbered
+   requirements the code quotes. `notes/phase-5-report.md` and `notes/phase-6-report.md`
+   deleted.
+2. **The `difficulty` flag needed no decision** — it was already removed during Phase 6,
+   and `tests/test_cli.py` asserts it is refused rather than ignored. The entry in this file
+   was stale. What was *not* fixed: the README still documented the flag in its CLI block,
+   so the first command a reviewer would copy did not run.
+3. **README read end to end.** Findings and fixes are listed below.
+
+**Left:**
+
+4. **A cold `docker compose up` from a fresh clone.** `notes/failure-modes.md` asks for this
+   explicitly and the reason is the strongest one in that document: the single-Dockerfile
+   path has been exercised exactly once. Docker Desktop was not running, so it is not done.
+5. **Video and rehearsal.** The human's own work.
+6. **Delete `BUILD.md`? No — see above.** Still to delete, at the very end:
+   `notes/RESUME.md` (this file) and `notes/conventions.md`. Before deleting RESUME.md,
+   rewrite the two citations to it in `notes/injection.md`, which quotes it as the source of
+   a claim it then corrects.
+7. **Flip the repo public.** It is private; a panel cannot see a private repo.
+
+### What the README read-through found
+
+Every item below was a defect a reviewer would have hit, not a matter of taste.
+
+| | |
+|---|---|
+| `ledgerloop generate ... --difficulty hard` | the flag was removed; the first documented command exited non-zero |
+| `ledgerloop chaos --run RUN_ID` | `chaos` takes `--in <batch>`; the fourth documented command exited non-zero |
+| a second Docker section | said **three** services and `copy .env.example .env`, contradicting the section above it, which correctly says two services and no `.env`. Stale from before the two Dockerfiles became one |
+| "The original finding, in full" | repeated the driver-prefix finding almost verbatim, 30 lines after it |
+| the provenance gate | carried *"to be re-measured on the sealed test set in Phase 7"* — a promise to a phase that had closed |
+| no roadmap | BUILD.md's README order asks for one and there was none |
+| the Status table | listed plan phases, with "8 README, video, rehearsal — in progress" visible to a reviewer |
+
+Both corrected CLI commands were run before being written down.
+
+**The provenance one is worth reading in full in the README.** The gate was never
+re-measured on the sealed set, because the only LLM job that ran there writes exception
+reasons and extracts no fields. Its record reads *3,343 items, 0 failed* — over **0 fields
+checked**. That summary looks like evidence and is not, and quoting it would have been the
+easiest available mistake in the document. It is now stated rather than quietly dropped.
 
 ### Phase 8 must not
 
@@ -282,8 +321,9 @@ That is enough. Everything decided is written down in `notes/`.
 
 ## Phases 5 and 6 are closed
 
-`notes/phase-5-report.md` and `notes/phase-6-report.md` carry the exit criteria, the
-measurements, and the things Phase 7 must not re-derive.
+Both phase reports were deleted in Phase 8. Nothing was lost: every finding in them was
+already recorded in `notes/failure-modes.md` or the README, which was checked line by line
+before deleting rather than assumed.
 
 **Phase 6 was assembly, and it still turned up four defects** — three of them reachable only
 from a real host, and one a cold `docker compose up` that had stopped building entirely.
@@ -300,16 +340,18 @@ precisely because nothing was tuned to produce it.
 **The line: anything about how the project was managed goes; anything about how the system
 works or why it works stays.**
 
-Delete before the repo goes public:
+Resolved:
 
-- `BUILD.md` — an internal plan with dates and phase slots. Not part of the deliverable.
-- `notes/RESUME.md` — this file. A session handoff, not evidence.
-- `notes/conventions.md` — how the work was done, not how the system works.
-- `notes/phase-5-report.md`, `notes/phase-6-report.md`, `notes/phase-7-precommitment.md` —
-  **decide deliberately.** The reports are phase-gate artifacts and read as management. The
-  pre-commitment is different: it is *evidence* that the operating point was fixed before
-  the test set was read, and deleting it would remove the only proof of that ordering. Keep
-  the pre-commitment; fold anything worth keeping from the reports into the README.
+- `BUILD.md` — **kept, stripped to the specification.** The line above says management goes
+  and how-the-system-works stays; BUILD.md was both, so it was split rather than judged as
+  a whole. 33 files cite it by name.
+- `notes/phase-5-report.md`, `notes/phase-6-report.md` — **deleted**, findings verified as
+  already recorded elsewhere first.
+- `notes/phase-7-precommitment.md` — **kept.** It is the only proof the operating point was
+  fixed before the test set was read, and the README links to it.
+- `notes/phase-7-report.md` — **kept.** It is the held-out measurement itself, and three
+  files that are being kept as evidence cite it.
+- `notes/RESUME.md` (this file), `notes/conventions.md` — **delete last**, after the video.
 
 Keep, and link from the README, because they are evidence:
 
@@ -336,8 +378,7 @@ documentation. Commit messages describe the change and the reasoning.
 - **Do not re-score `data/test` and do not retune against it.** It has been reported.
 - **Never commit `.env`.** `tests/test_secrets.py` fails the build if it is tracked, or
   if any tracked file grows a credential-shaped string.
-- `difficulty` is still a no-op flag. Wire it in Phase 7 or drop it — do not ship
-  something that lies about what it does.
+- **Docker Desktop must be running** for the cold-start check that is still outstanding.
 
 ## Where the reasoning lives
 

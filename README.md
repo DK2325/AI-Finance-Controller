@@ -15,16 +15,17 @@ tenfold on the two case types it had never seen — with nothing in the output t
 the two situations. [What it gets wrong](#what-it-gets-wrong) is a section of this README,
 not an appendix.
 
-> Razorpay AI Buildathon, Track 04 (AI Finance Controller). Build plan in [BUILD.md](BUILD.md).
+> Razorpay AI Buildathon, Track 04 (AI Finance Controller).
 
 ---
 
 ## Metrics
 
-**These are held-out numbers.** `data/test` was sealed at Phase 1, never read during
-development, and opened once at Phase 7 to produce the table below. The threshold was fixed
-and committed *before* the seal was broken, at commit `a733ad4`, together with a written
-prediction of what the numbers would be — see
+**These are held-out numbers.** `data/test` was generated and sealed before any model
+existed, never read while the system was built, and opened exactly once — at the end — to
+produce the table below. The threshold was fixed and committed *before* the seal was
+broken, at commit `a733ad4`, together with a written prediction of what the numbers would
+be — see
 [notes/phase-7-precommitment.md](notes/phase-7-precommitment.md). Nothing was retuned
 afterwards, and the marker was deleted in the same commit as the results, so the unsealing
 is an event in the git history rather than a claim here.
@@ -96,20 +97,19 @@ is the tuning the pre-commitment exists to prevent.
 
 ## Status
 
-The sealed test set has been opened and reported; a working v1 exists, tagged
-`v1-working`.
+**Built, deployed, and measured against a held-out set that was opened once.** The model is
+tagged `v1-working`; the live URL serves the same held-out run this README reports, not a
+sample.
 
-| Phase | Scope | State |
-|---|---|---|
-| 0 | Scaffold, Compose, schema, isolation lint | ✅ complete |
-| 1 | Synthetic generator, real schemas, held-out design | ✅ complete |
-| 2 | Eval harness, risk–coverage curve | ✅ complete |
-| 3 | Blocking, exact and fuzzy matching | ✅ complete |
-| 4 | Classifier, calibration, selective prediction | ✅ complete |
-| 5 | LLM exception layer, audit trail | ✅ complete |
-| 6 | API, frontend, chaos mode | ✅ complete |
-| 7 | Sealed test set, held-out results, failure analysis | ✅ complete |
-| 8 | README, video, rehearsal | in progress |
+| | |
+|---|---|
+| Synthetic generator, real schemas, held-out design | ✅ |
+| Evaluation harness, risk–coverage curve, orphan scoring | ✅ |
+| Blocking, exact and fuzzy matching | ✅ |
+| Classifier, isotonic calibration, selective prediction | ✅ |
+| LLM exception layer, provenance gate, audit trail | ✅ |
+| API, four screens, live operating-point slider | ✅ deployed |
+| Sealed test set, held-out results, failure analysis | ✅ opened once, reported |
 
 ### Risk-coverage curve
 
@@ -174,8 +174,8 @@ undecided. Reproducible, and not principled -- and only the second is defensible
 financial control. Ties are now broken on evidence (date proximity, then rule tier, then
 invoice-link strength) with the deciding rule recorded in the audit record.
 
-**The honest roadmap line:** a finer-grained ranking signal is the obvious next
-improvement. Calibration and discrimination are different properties, this project
+A finer-grained ranking signal is the obvious next improvement, and it is item 4 of the
+[roadmap](#roadmap). Calibration and discrimination are different properties, this project
 optimised hard for the first, and the second is where the remaining coverage lives.
 
 #### Where it came from
@@ -183,7 +183,7 @@ optimised hard for the first, and the second is where the remaining coverage liv
 | | coverage | precision | notes |
 |---|---|---|---|
 | Baseline (exact UTR only) | 49.87% | 37.96% | regression floor, on `data/train` |
-| Phase 3 rules, no model | 76.48% | 98.67% | ranked tiers, **not** calibrated, on `data/train` |
+| Rules only, no model | 76.48% | 98.67% | ranked tiers, **not** calibrated, on `data/train` |
 | **Calibrated, sealed test set** | **62.91%** | **99.90%** | at the pre-committed point, held out |
 
 The rules reach more coverage; the model is right when it is confident, and says so in a
@@ -214,9 +214,7 @@ is not adjudication.
 
 ## How the LLM is constrained
 
-The LLM never decides a match. It parses narration, proposes journal entries, and writes
-exception reasons — and every response is constrained at decode time rather than parsed
-hopefully.
+Every response is constrained at decode time rather than parsed hopefully.
 
 Measured on 50 real narrations from `data/train`, ugliest-weighted, against the real
 parser schema (nested object, enum, optionals, bounded float):
@@ -589,10 +587,18 @@ stops it normalising:
 > normalise a company name into the form you think it should take.*
 
 **Measured over 100 real narrations, 366 fields: zero provenance failures, and
-`counterparty_name` verified 100 out of 100.** The strictness costs nothing because the
-prompt and the check were designed against each other. Loosening either one alone would
-make the pair worse. *(To be re-measured on the sealed test set in Phase 7 before this is
-treated as settled.)*
+`counterparty_name` verified 100 out of 100.** A later batched run over 199 narrations
+agrees: 199 of 199 counterparty names claimed and verified, zero failures. The strictness
+costs nothing because the prompt and the check were designed against each other. Loosening
+either one alone would make the pair worse.
+
+**This was never re-measured on the sealed test set, and the reason is worth stating rather
+than leaving as a gap.** The only LLM job that ran against `data/test` writes exception
+reasons; it extracts no fields, so there is nothing for the gate to verify. Its provenance
+record reads *3,343 items, 0 failed* — over **0 fields checked**. That summary looks like
+evidence and is not, and quoting it would have been the easiest available mistake in this
+document. The gate's figures stand on `data/train` narrations, at n=100 and n=199, and are
+labelled as such everywhere they appear.
 
 The provenance gate is **not** an injection defence, and an earlier version of this
 project claimed it was. Being present in the narration is what makes text injection — so
@@ -742,52 +748,26 @@ the same check on a running container.
 
 *(It caught a bug in itself on first run, which is the behaviour you want from a check.)*
 
-### The original finding, in full
-
-Managed Postgres providers inject `DATABASE_URL` as `postgresql://…` (Railway, Render) or
-the legacy `postgres://…`. SQLAlchemy reads that scheme as the **driver**, and bare
-`postgresql://` means psycopg2 — which this project does not install; it uses psycopg 3.
-
-> **A perfectly correct injected URL fails to connect, and fails looking like a network
-> problem rather than a driver one.**
-
-`ledgerloop/config.database_url()` normalises both forms to `postgresql+psycopg://`.
-
-Neither local path could have caught it. Locally `DATABASE_URL` is absent and the default
-already names the driver; `docker compose` sets it explicitly with `+psycopg`. Only a
-managed host injects the bare form — which is the argument for deploying early rather than
-at the end, and this was found on the first deploy rather than the last.
-
-(Railway also sets `DATABASE_URL` to an empty string when a variable reference does not
-resolve, and `os.environ.get(key, default)` returns that empty string rather than the
-default. Same symptom, different cause, also handled.)
-
-
-Docker Compose is the primary run path, not an optional extra.
-
-```
-copy .env.example .env
-docker compose up
-```
-
-Three services come up: `db` (PostgreSQL 16), `api` (FastAPI on :8000), `web` (:3000).
-Migrations apply automatically on `api` start, and the API will not start until Postgres
-passes its healthcheck.
-
 ### CLI
 
 The Typer CLI is the canonical interface — there is no Makefile, and every path works on
 Windows.
 
 ```
-ledgerloop generate --rows 1000 --seed 42 --difficulty hard --out data/train
+ledgerloop generate --rows 1000 --seed 42 --out data/train
 ledgerloop recon --in data/train --mock-llm
 ledgerloop eval --run RUN_ID
-ledgerloop chaos --run RUN_ID --corruption unseen_narration
+ledgerloop chaos --in data/demo --corruption unseen_narration
 ```
 
-`--mock-llm` runs the entire pipeline with no API key. Every phase before Phase 5 depends
-on this working.
+`--mock-llm` runs the entire pipeline with no API key, and so does `chaos` unless you ask
+it to interpret a corruption in free text. Nothing above the LLM exception layer needs a
+key at all, which is what makes the whole pipeline testable without a network.
+
+There is no `--difficulty` flag. There was one for a while, it was accepted and did
+nothing, and it was removed rather than wired: a flag that lies about what it does is
+worse than an absent flag, because it invites someone to rely on it.
+`tests/test_cli.py` asserts it is refused rather than ignored.
 
 ### Local development
 
@@ -937,3 +917,41 @@ output distinguishes the two.** A confident score on a familiar case type and a 
 score on an unfamiliar one look identical to the caller. That is the limitation, and it is
 the reason the held-out case types are reported separately everywhere in this document
 rather than averaged into a single generalisation claim.
+
+## Roadmap
+
+**Every item below is named by a measurement rather than by ambition**, and each says what
+would have to change. Three of the four are deliberately **not built**, for one reason: they
+were found by reading the sealed test set, and a fix validated against the batch that
+exposed it is a fix tuned to that batch. They belong against a batch generated after these
+numbers were published, where the remedy can be measured somewhere it was not discovered.
+
+**1. Candidate generation for netted refunds — the largest recoverable block.**
+`refund_netted` is 0 of 200 because blocking never produces a candidate, not because the
+classifier ranks one badly. A subset-sum pass over recent refunds against the shortfall
+would produce it, and `core/subsetsum.py` already has the machinery. Same root cause as
+`AMBIGUOUS_CANDIDATES` being only 26.7% actionable: an operator sent to review candidates
+none of which is the true credit is being shown a retrieval failure with a label on it.
+4% of the modelled distribution currently sits at zero.
+
+**2. Apply the operating point before resolution consumes invoices.** `resolve()` lets a
+candidate the system will then decline to act on take an invoice from the settlement that
+owns it — 5 settlements in 4,950. The change is small. It would also move every number
+above, which is precisely why it is not being made against the batch that found it.
+
+**3. Re-select the operating point at production volume.** The pre-committed threshold
+gives 99.9037% on 4,950 settlements and 99.2369% on 24,750 — below the floor this system is
+designed around. Holding the floor at the larger volume means a higher threshold and less
+coverage, and that trade should be chosen deliberately rather than inherited. Whether batch
+size *causes* the difference is still a hypothesis; testing it is part of the work.
+
+**4. A finer-grained ranking signal.** Isotonic is the right calibrator on measured ECE and
+it is a step function: 99.7% of candidates share an exact calibrated probability with
+another candidate, so the score cannot separate two near-identical candidates at all.
+Unlike the three above, this one is not held back by the seal — it is an ordinary modelling
+change, evaluated the ordinary way.
+
+**What is deliberately not on this list:** anything that would improve a number reported
+above without a mechanism to explain it. Every figure here survived a seal, and the way to
+keep them worth something is to change the system and re-measure, not to re-measure until
+the number moves.

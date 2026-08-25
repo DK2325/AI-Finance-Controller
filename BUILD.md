@@ -1,68 +1,20 @@
-# LedgerLoop — Build Plan
+# LedgerLoop — the specification
 
 **Razorpay AI Buildathon, Track 04 (AI Finance Controller).**
-Submission deadline: 5 September 2026. Build completes 4 September.
 
----
+This is the document the system was built against, and it is quoted by name from 33 files
+in this repository — docstrings, tests, and `docker-compose.yml` all cite it as the reason
+a rule exists. It is kept for that reason: a comment saying *"BUILD.md forbids O(n²)
+candidate generation"* is worth less if the reader cannot go and check.
 
-## READ THIS FIRST
+What it contains is the architecture rules, the data contracts, the metric definitions and
+the requirements, numbered in the order they were built. What it no longer contains is the
+project management — the calendar, the gate ceremony, the contingency plan for running
+late. Those described how the work was organised, not how the system works, and a reviewer
+has no use for them.
 
-You are building this project with a human partner over roughly thirteen days.
-This file is the complete specification: architecture rules, phase order, and
-exit gates.
-
-**Operating rules, in force for the entire build:**
-
-1. Read this entire file before writing any code.
-2. Work **one phase at a time**. At the end of every phase you **stop**, produce
-   the Phase Report described below, and wait. Do not begin the next phase, do
-   not ask "shall I continue?", do not do preparatory work for the next phase.
-   Stop and hand back control.
-3. Plan before you implement. Show the plan, wait for approval, then build.
-4. Stay inside the phase's declared scope. If a change outside it seems
-   necessary, stop and say so rather than making it.
-5. Commit at every passing test. Small commits, present tense, one logical
-   change. The commit history is part of the submission.
-6. The environment is **Windows**. No `make`. The Typer CLI is the canonical
-   interface. All paths must work on Windows.
-7. **No API key exists until Phase 5.** Every phase before that must run fully
-   with `--mock-llm`. Design for this from the start; do not stub it in later.
-
-### Phase Report format
-
-At every gate, output exactly this and then stop:
-
-```
-PHASE N COMPLETE
-
-Exit criteria:   [each one, PASS or FAIL with evidence]
-Metrics:         [current numbers, if the phase produced any]
-Decisions:       [design choices made, and what was rejected and why]
-Deviations:      [anything built differently from this plan, and why]
-Shortcuts:       [anything that would not survive production]
-Risks:           [what could bite us in a later phase]
-Next phase:      [one line on what Phase N+1 will do]
-
-Awaiting approval to proceed.
-```
-
-### On using your own judgment
-
-You are not required to follow this plan literally where you can see a better
-route. If a different technique, library, or ordering produces a measurably
-stronger result, **propose it during planning**, state the trade-off, and
-implement it once approved.
-
-That latitude is bounded by three things, which are not negotiable:
-
-- The architecture rules below.
-- The generator/matcher isolation boundary.
-- The exit criteria of the current phase. Improve *how* they are met; never
-  weaken *what* is met.
-
-Improvements that add **depth** are welcome. Improvements that add **scope** are
-not — this is a thirteen-day build judged on one loop closed properly. When
-unsure which a suggestion is, ask.
+Where the build deviated from what is written here, the deviation is recorded here too,
+beside the thing it deviates from.
 
 ---
 
@@ -94,6 +46,23 @@ submission and a winning one. Do not cut them:
   moment the panel remembers.
 - **The honest failure list** — documented cases the system cannot solve, with
   reasons. The brief rewards this twice.
+
+> **Measured against the above, after the fact.** The two figures in this section were
+> illustrative when they were written and are left in place rather than tidied away, because
+> a specification edited to match its results is not a specification. What was actually
+> measured, once, on a sealed set at a threshold fixed beforehand: **62.91% coverage at
+> 99.9037% precision**, and 99.2369% on a batch five times larger — below the floor this
+> system is designed around. Both are in the README, and neither is quotable without the
+> other.
+>
+> **The held-out claim needs the sharper correction.** "This proves generalisation rather
+> than memorisation" is not what happened. One unseen case type generalised (`tds_deducted`,
+> 68.00%, indistinguishable from ordinary performance at this sample size); the other did
+> not generalise at all (`refund_netted`, 0 of 200). The reason is mechanical and is the
+> more useful result: the system generalises to an unseen deduction expressible as a *rate*
+> on the amount, and fails completely where no rate links the invoice to the credit, because
+> blocking never generates a candidate for the classifier to score. Held-out case types
+> turned out to prove something more specific than the claim they were included to support.
 
 ---
 
@@ -231,19 +200,20 @@ most common way to lose this.
 
 ---
 
-# PHASES
+# REQUIREMENTS
+
+Numbered in the order they were built. The numbering is load-bearing:
+code and tests cite these sections by number.
 
 ---
 
-## PHASE 0 — Foundation
-**22 Aug · half day · scope: repo root, `pyproject.toml`, CLI skeleton**
-
+## 0. Foundation
 ### Tasks
 - Scaffold the directory layout above. Initialise git, `uv`, `ruff`.
 - Typer CLI skeleton with all four commands registered as no-ops.
 - **`docker-compose.yml` with three services: `db` (postgres:16-alpine), `api`,
-  `web`.** Get this fully working now — a broken Compose discovered on 4 Sept is
-  unrecoverable.
+  `web`.** *(Two as built — see the deviation under Repository layout.)* Get this fully working at the start rather than at the end. A run path that
+  is only exercised for the first time when it is needed is not a run path.
   - `db` has a healthcheck using `pg_isready`
   - `api` uses `depends_on: db: condition: service_healthy`
   - named volume for Postgres data so it survives `docker compose down`
@@ -258,24 +228,22 @@ most common way to lose this.
   the provider is NVIDIA NIM, not Anthropic. See notes/decisions.md.) Never commit a
   real key.
 
-### Exit criteria
+### Must be true before this is done
 - [ ] `ledgerloop --help` lists all four commands
 - [ ] `ruff check` clean
 - [ ] Import-lint test exists and passes
 - [ ] **`docker compose up` from a clean clone starts all three services and
-      applies migrations with no manual step**
+      applies migrations with no manual step** — *two services as built; the third
+      was redundant and became a maintenance hazard. Recorded under Repository
+      layout above.*
 - [ ] **`docker compose down && docker compose up` preserves data**
 - [ ] API waits for Postgres correctly — verified by starting on a cold machine
 - [ ] No money column is a float type anywhere in the schema
 - [ ] Initial commit pushed to a public GitHub repo
 
-**STOP. Phase Report. Await approval.**
-
 ---
 
-## PHASE 1 — Synthetic data generator
-**23–24 Aug · scope: `datagen/`, `data/`**
-
+## 1. Synthetic data generator
 Everything downstream is measured against this. Correctness here is
 load-bearing.
 
@@ -349,7 +317,7 @@ produced without them while the test batch contains all ten.
 - `data/test/` — seed 7, all ten case types. **Sealed until Phase 7.**
 - `data/demo/` — seed 99, 500 rows, for the live demo
 
-### Exit criteria
+### Must be true before this is done
 - [ ] Same seed produces byte-identical output; different seeds produce
       genuinely different data, not a reshuffle
 - [ ] Test asserts each case type within 1% of target share
@@ -360,13 +328,9 @@ produced without them while the test batch contains all ten.
 - [ ] One instance of each case type hand-verifiable from the CSVs
 - [ ] All three batches generated and committed
 
-**STOP. Phase Report. Await approval.**
-
 ---
 
-## PHASE 2 — Evaluation harness
-**25 Aug · scope: `evals/`**
-
+## 2. Evaluation harness
 Built before the matcher so there is a measurable target from day one.
 
 ### Metrics required
@@ -388,7 +352,7 @@ Built before the matcher so there is a measurable target from day one.
   that table.
 - Include a deliberately weak baseline (exact-UTR-only) as a regression floor.
 
-### Exit criteria
+### Must be true before this is done
 - [ ] `ledgerloop eval` runs end to end against the baseline
 - [ ] Baseline scores plausibly low — a scorer reporting near-perfect results
       on a weak baseline is broken; investigate before proceeding
@@ -397,13 +361,9 @@ Built before the matcher so there is a measurable target from day one.
 - [ ] Scoring logic unit-tested with hand-built fixtures
 - [ ] README table regenerates automatically
 
-**STOP. Phase Report. Await approval.**
-
 ---
 
-## PHASE 3 — Blocking, exact and fuzzy matching
-**26–27 Aug · scope: `core/`**
-
+## 3. Blocking, exact and fuzzy matching
 Target: ~75% match rate with zero LLM calls.
 
 ### Tasks
@@ -421,7 +381,7 @@ Target: ~75% match rate with zero LLM calls.
   fee/GST/TDS rate, and whether the pair participates in a plausible subset sum.
 - Everything in `core/` is a pure function. No I/O below orchestration.
 
-### Exit criteria
+### Must be true before this is done
 - [ ] Match rate ≥ 70% on train with no model and no LLM
 - [ ] 25,000 rows in under 60 seconds
 - [ ] Every matching rule has a named unit test describing its case
@@ -429,17 +389,13 @@ Target: ~75% match rate with zero LLM calls.
 - [ ] Feature extraction returns a documented, stable schema
 
 ### Explanation checkpoint
-Before the gate, the human writes out from memory how blocking works and why
-it is necessary, then diffs against the implementation. Include a one-paragraph
-plain-language explanation of blocking in the Phase Report to support this.
-
-**STOP. Phase Report. Await approval.**
+Write out from memory how blocking works and why it is necessary, then diff that
+against the implementation. Anything that cannot be explained from memory is
+either not understood or not needed.
 
 ---
 
-## PHASE 4 — Classifier, calibration, selective prediction
-**28–29 Aug · scope: `model/`**
-
+## 4. Classifier, calibration, selective prediction
 The thesis lives here. A complete working v1 exists at the end of this phase.
 
 ### Tasks
@@ -453,7 +409,7 @@ The thesis lives here. A complete working v1 exists at the end of this phase.
   curve in `notes/threshold.md`.
 - Version the model artifact; the version goes into every audit record.
 
-### Exit criteria
+### Must be true before this is done
 - [ ] Reliability diagram committed; calibration visibly holds
 - [ ] Auto-match precision ≥ 99% at the operating point on train
 - [ ] Risk–coverage curve generated across 50–100% coverage
@@ -465,13 +421,9 @@ The thesis lives here. A complete working v1 exists at the end of this phase.
 Why calibration matters and what breaks without it. This is the single most
 likely technical question at the panel. Include the explanation in the report.
 
-**STOP. Phase Report. Await approval.**
-
 ---
 
-## PHASE 5 — LLM exception layer and audit trail
-**30–31 Aug · scope: `llm/`**
-
+## 5. LLM exception layer and audit trail
 **The API key arrives at the start of this phase.** Everything built so far must
 still run under `--mock-llm` when it is absent.
 
@@ -492,7 +444,7 @@ still run under `--mock-llm` when it is absent.
   fixture.
 - `--mock-llm` remains fully functional after this phase.
 
-### Exit criteria
+### Must be true before this is done
 - [ ] Reason-code enum fixed and documented
 - [ ] Schema validation failure rate measured and reported
 - [ ] Token cost per 1,000 rows measured and reported in ₹
@@ -504,13 +456,9 @@ still run under `--mock-llm` when it is absent.
 ### Explanation checkpoint
 Why the LLM is not allowed to decide matches. Expect this question verbatim.
 
-**STOP. Phase Report. Await approval.**
-
 ---
 
-## PHASE 6 — API, frontend, chaos mode
-**1–2 Sep · scope: `api/`, then `web/`**
-
+## 6. API, frontend, chaos mode
 Panels do not clone repositories. This phase produces the thing they click.
 
 ### API
@@ -528,6 +476,12 @@ Long runs are jobs with status polling, never blocking requests.
    journal entry, approve/reject/edit. Approval writes an audit record with
    approver and timestamp.
 
+> **Deviation: four screens shipped, not three.** Chaos mode is specified below as "a
+> control" and was built as a screen of its own rather than a button on the dashboard,
+> because a corruption run produces a before/after comparison table that has nowhere to
+> live on a screen already carrying the slider. The three screens above are unchanged;
+> the fourth is chaos.
+
 ### Chaos mode
 A control that injects novel, unmodelled corruption into a live batch:
 unseen narration formats, a bank reporting dates differently, amounts off by an
@@ -538,7 +492,7 @@ Support a free-text corruption spec so the panel can name one on the spot.
 Failing gracefully under chaos **is** the point — a graceful failure proves the
 thesis as well as a success does.
 
-### Exit criteria
+### Must be true before this is done
 - [ ] Live public URL, seeded with a completed run
 - [ ] `docker compose up` and a stranger understands the product in 60 seconds
 - [ ] Demo batch loads and completes in one click
@@ -546,13 +500,9 @@ thesis as well as a success does.
 - [ ] Chaos mode runs live and degrades gracefully
 - [ ] Readable on a laptop screen in a shared video call
 
-**STOP. Phase Report. Await approval.**
-
 ---
 
-## PHASE 7 — Scale, sealed test set, failure analysis
-**3 Sep · scope: all, plus `notes/`**
-
+## 7. Scale, sealed test set, failure analysis
 ### Tasks
 - **Break the seal on `data/test/` — once.** Run it. Report those numbers,
   including performance on the two held-out case types the model has never
@@ -567,12 +517,12 @@ thesis as well as a success does.
   economics and almost no student submission does the arithmetic.
 - **Settlement Q&A layer** — natural-language questions answered **strictly
   from the audit records**, never free-form generation. "Why is ₹4.2L
-  unreconciled for ACME in July?" resolves to stored decisions. Cut this
-  without hesitation if the day is tight; everything above it ranks higher.
+  unreconciled for ACME in July?" resolves to stored decisions. **The lowest-ranked
+  item in this document — cut it before anything above it.** It was cut.
 - `notes/failure-modes.md`: which cases fail, why, what would fix them, what
   remains unsolved. Plain language.
 
-### Exit criteria
+### Must be true before this is done
 - [ ] Test-set metrics reported, unretuned
 - [ ] Held-out case-type performance reported separately and honestly
 - [ ] 25,000-row run with recorded throughput and ₹ cost
@@ -583,92 +533,3 @@ thesis as well as a success does.
 ### Note
 Produce the matrices and the data. The **written interpretation is the human's
 own work** — it will be defended in person.
-
-**STOP. Phase Report. Await approval.**
-
----
-
-## PHASE 8 — README, video, rehearsal
-**4 Sep · 5 Sep is buffer and submission**
-
-### README order
-1. One-line problem statement
-2. **Metrics table** (auto-generated) — above the fold
-3. The risk–coverage curve
-4. Architecture diagram
-5. Why deterministic-first, LLM-last
-6. Reproduce in three commands
-7. **What it gets wrong** — the honest failure list
-8. Unit economics
-9. Roadmap
-
-### Pitch video — five minutes
-The brief specifies a **5 minute** pitch video. Use all five.
-
-| Time | Content |
-|---|---|
-| 0:00–0:30 | Problem, opening on the headline number |
-| 0:30–1:30 | Architecture: four layers, LLM last, why |
-| 1:30–2:45 | Live run on the **full** batch — say it is the full batch |
-| 2:45–3:30 | Risk–coverage curve, money-weighted precision, ₹ cost |
-| 3:30–4:30 | **Chaos mode, live.** Novel corruption, graceful degradation |
-| 4:30–5:00 | What it gets wrong, and what's next |
-
-Close on the exception queue, not the dashboard. The honest list is the point.
-
-### Rehearse these
-- Why not just prompt an LLM for the whole thing?
-- What is your false-match rate, and what does a false match cost the merchant?
-- How did you choose the operating point on the curve?
-- How do you know your synthetic data resembles real settlement data?
-- Your metrics are on data you generated — why should I trust them?
-- What breaks at 10 million rows?
-- How do you handle a prompt-injected bank narration?
-- How do you know a retrained model hasn't regressed?
-- Which part of this are you least confident in?
-
-The last one is answered honestly. It lands better than a deflection, and
-`notes/failure-modes.md` already contains the answer.
-
-**STOP. Phase Report. Await approval.**
-
----
-
-## SCHEDULE
-
-| Date | Phase | Milestone |
-|---|---|---|
-| 22 Aug | 0 | Scaffold, isolation lint |
-| 23–24 Aug | 1 | Generator, real schemas, held-out design |
-| 25 Aug | 2 | Eval harness, risk–coverage curve |
-| 26–27 Aug | 3 | ~75% match, no LLM |
-| 28–29 Aug | 4 | **v1 working — safety net** |
-| 30–31 Aug | 5 | Exceptions, audit trail (API key needed) |
-| 1–2 Sep | 6 | Deployed, three screens, chaos mode |
-| 3 Sep | 7 | Sealed test set, held-out results, honest failures |
-| 4 Sep | 8 | README, video, rehearsal |
-| 5 Sep | — | Buffer and submit |
-
-Buffer is 5 September. Do not spend it early.
-
----
-
-## IF THE SCHEDULE SLIPS
-
-Cut in this order:
-1. Settlement Q&A layer
-2. Frontend polish on the review-queue screen
-3. The 25,000-row scale run (report 5,000 instead)
-4. The deployed public URL — fall back to Compose plus the recorded video
-
-Never cut, in any circumstance: the sealed test set, the held-out case types,
-calibration, the audit trail, chaos mode, `notes/failure-modes.md`, or a
-working `docker compose up`. Those are the submission.
-
-Note that Docker Compose is no longer cuttable — with Postgres it is the run
-path, not a convenience. If Compose breaks, the project does not run for
-anyone but you.
-
----
-
-**Begin with Phase 0. Plan first. Stop at the gate.**

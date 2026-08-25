@@ -926,9 +926,9 @@ which git can re-include from, and all three exceptions now work for the reason 
 gives.
 
 **The tell, in hindsight:** the rule had never been exercised. Every path it supposedly
-protected predated it. The same shape as the deployment findings in
-`notes/phase-6-report.md` — a path that stopped being exercised is a path that has stopped
-being checked, whether or not anything about it changed.
+protected predated it. The same shape as the three deployment findings in the README — a
+path that stopped being exercised is a path that has stopped being checked, whether or not
+anything about it changed.
 
 ### A reproducibility test that was partly asserting on the clock
 
@@ -1124,5 +1124,11 @@ the failure mode rather than detecting it.
 
 **The practical rule this leaves:** whichever path you run daily is the one that works. Any
 other path is a claim, and it decays silently from the moment it stops being exercised.
-Phase 8 should run the cold start again from a fresh clone, because this one is now a path
-that has been exercised exactly once.
+
+Which makes the standing obligation on this repository specific rather than general: **the
+cold `docker compose up` from a fresh clone has now been exercised exactly once.** Once is
+enough to know it works today and not enough for it to stay a run path. It should be run
+again from a clone before anyone is invited to try it, and again whenever the image or the
+compose file changes — not because something is expected to break, but because the finding
+above is precisely that nothing breaks. Things stop being the same, one correct change at
+a time.

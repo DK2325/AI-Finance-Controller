@@ -117,8 +117,8 @@ builds a `RiskCoverageCurve` of points, one per distinct confidence threshold, e
 carrying `threshold, coverage, precision, recall, money_weighted_precision,
 money_error_ratio, n_predicted, n_true_positives, n_false_positives`.
 
-It is consumed by Phase 4 (operating-point selection), Phase 6 (the live slider) and
-Phase 8 (the video). The chart is a consumer; tests assert on the curve data, never on
+It has three consumers: operating-point selection, the live slider in the API, and the
+chart in the README. The chart is a consumer; tests assert on the curve data, never on
 rendered pixels, because matplotlib output varies by version.
 
 **A deterministic system has a degenerate curve.** The Phase 2 baseline emits near-fixed
