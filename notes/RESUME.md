@@ -235,7 +235,9 @@ live site              schema fixed and REDEPLOYED; confirmed storing to postgre
                        six tables present, footer shows v1-test / data/test
 throughput             105 settlements/s at 24,750 rows, AMD Ryzen 5 5600H, six cores
                        reason job 10.1 rpm; parse 27.2 rpm -- quote the job, not "the" rate
-tests                  526 passing in ~55s, ruff clean
+tests                  530 passing, ruff clean  (wall clock depends on whether a
+                       half-open 5432 is present -- each DB connect then costs the
+                       bounded 5s x 2 resolved addresses)
                        (was reported as 507; the count was partly luck, see
                         failure-modes.md "Guards that passed for the wrong reason")
 ```
