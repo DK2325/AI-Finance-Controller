@@ -17,8 +17,10 @@ was a COPY line and an exclusion, and those are text.
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -270,6 +272,128 @@ def test_a_migration_failure_cannot_stop_the_service_starting(monkeypatch) -> No
 
     assert state == "failed"
     assert "RuntimeError" in detail and "alembic fell over" in detail
+
+
+# The engine-bearing packages, named rather than discovered. `rglob` from the repository
+# root walks site-packages before any filter can reject it, and on this project that is
+# tens of thousands of files for a scan of four.
+SOURCE_DIRS = ("ledgerloop", "api", "core", "model", "llm", "datagen", "evals")
+ENGINE_BUILDERS = {"create_engine", "engine_from_config"}
+
+
+def _engine_calls() -> list[tuple[str, int, ast.Call]]:
+    found = []
+    files = [f for d in SOURCE_DIRS for f in (REPO_ROOT / d).rglob("*.py")]
+    files += list(REPO_ROOT.glob("*.py"))
+    for path in sorted(files):
+        if "__pycache__" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+            if name in ENGINE_BUILDERS:
+                found.append((path.relative_to(REPO_ROOT).as_posix(), node.lineno, node))
+    return found
+
+
+def test_every_engine_bounds_its_connect() -> None:
+    """A migration that can hang is not a migration that cannot stop the service.
+
+    The test above proves a migration *failure* is caught. It can prove nothing about a
+    migration that never returns: nothing raises, so nothing is caught, the lifespan never
+    yields, and the service never finishes starting -- no routes, no `/health`, no answer
+    of any kind. Non-fatal and non-terminating are different properties and only one of
+    them had a test.
+
+    That gap was real. `ledgerloop/db.py` got a connect timeout when a half-open peer hung
+    every caller; the alembic environment builds a *second* engine, was never given one,
+    and it is the engine that runs first. Measured on Windows against a port with nothing
+    listening: `connect()` had not returned after ninety seconds, sitting in psycopg's
+    connect loop, while a plain blocking socket to the same port was refused in two.
+
+    Asserted over every engine in the repository rather than over the two that exist
+    today, because the defect being fixed here *is* a second engine that was missed when
+    the first one was fixed. Naming them individually would rebuild the same trap.
+    """
+    engines = _engine_calls()
+    assert engines, (
+        "no engine construction was found at all -- this test has stopped watching "
+        "anything, which is worse than failing"
+    )
+
+    for where, line, call in engines:
+        kwargs = {k.arg: k.value for k in call.keywords if k.arg}
+        assert "connect_args" in kwargs, (
+            f"{where}:{line} builds an engine with no connect_args, so its connect has no "
+            f"deadline. libpq is never told to give up without one, and the wait is not "
+            f"bounded by anything else"
+        )
+        assert "connect_timeout" in ast.dump(kwargs["connect_args"]), (
+            f"{where}:{line} passes connect_args without connect_timeout. That is the "
+            f"only parameter that bounds the wait; pool_timeout bounds a different one"
+        )
+
+
+def test_running_migrations_does_not_switch_off_the_application_log() -> None:
+    """`fileConfig` disables every existing logger unless told not to.
+
+    Harmless while migrations only ever ran from a terminal, where there are no other
+    loggers worth keeping. It stopped being harmless when they moved inside the
+    application's lifespan: uvicorn builds its loggers first, so the default silences the
+    running server -- which keeps serving and stops saying anything, including the line
+    that reports whether these very migrations worked.
+
+    A silent service is a worse failure than a loud one, because every instrument still
+    reads normal. This one cost a misdiagnosis: a start-up hang had just been fixed, and
+    the absence of a log line was read as the hang persisting while the server was
+    answering in ten milliseconds.
+    """
+    env = (REPO_ROOT / "ledgerloop" / "migrations" / "env.py").read_text(encoding="utf-8")
+    assert "disable_existing_loggers=False" in env, (
+        "the migration environment calls fileConfig with the default "
+        "disable_existing_loggers=True, so applying migrations at start-up switches off "
+        "the application's logging for the rest of the process"
+    )
+
+
+def test_the_startup_report_is_not_silenced_by_the_migration_config() -> None:
+    """The line that says whether migrations ran has to survive them running.
+
+    `alembic.ini` pins the root logger to WARNING. A logger with no level of its own
+    inherits that, so `log.info("migrations ...")` in the lifespan was formatted and
+    thrown away -- on every deploy, in the one place someone would look to find out
+    whether the schema had been applied.
+
+    Asserted on the logger's own level rather than by capturing output, because pytest's
+    caplog raises the level to capture and would hide exactly this defect.
+    """
+    from api import main
+
+    assert main.log.level == logging.INFO, (
+        "the start-up logger has no level of its own, so it inherits root -- which "
+        "alembic.ini pins to WARNING the moment migrations run. The line reporting "
+        "whether migrations succeeded would be written and discarded"
+    )
+
+
+def test_both_engines_bound_their_connect_to_the_same_number() -> None:
+    """Two timeouts that can disagree will, and the disagreement will be silent.
+
+    The application's engine and the migration engine answer the same question about the
+    same database. If one waits five seconds and the other thirty, the service reports a
+    dependency healthy while the thing that gates its start-up is still waiting -- so the
+    constant is imported rather than repeated, and this asserts that it stays imported.
+    """
+    env = (REPO_ROOT / "ledgerloop" / "migrations" / "env.py").read_text(encoding="utf-8")
+    assert "from ledgerloop.db import CONNECT_TIMEOUT" in env, (
+        "the migration environment no longer imports the shared timeout, so the two "
+        "engines can now drift apart without anything noticing"
+    )
+    assert '"connect_timeout": CONNECT_TIMEOUT' in env, (
+        "the migration environment imports the shared timeout but does not use it"
+    )
 
 
 def test_the_schema_check_asks_about_tables_not_about_the_connection(monkeypatch) -> None:

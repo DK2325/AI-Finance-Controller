@@ -31,6 +31,7 @@ is the optimistic one -- the exact inversion of the truth.
 from __future__ import annotations
 
 import logging
+import mimetypes
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -54,6 +55,12 @@ DEMO_BATCH = "data/demo"
 DEMO_MODEL = "runs/_models/v1"
 
 log = logging.getLogger("ledgerloop.startup")
+# Given a level of its own, because it cannot borrow one. Applying migrations runs
+# alembic.ini's logging config, which pins the root logger to WARNING -- so this logger,
+# having no level, inherited WARNING and the start-up report below was written and
+# discarded. Set here rather than by raising the root level, which would change what
+# every other library in the process is allowed to say.
+log.setLevel(logging.INFO)
 
 # The tables an approval writes to. Checked by name rather than by asking Alembic which
 # revision it has stamped, because a stamped revision and an existing table are different
@@ -586,6 +593,15 @@ async def upload(
 # ---------------------------------------------------------------------- static
 
 if STATIC_DIR.is_dir():
+    # StaticFiles takes the content type from the platform's mimetypes registry, and
+    # .woff2 is not in it on every host -- Windows here, and a slim container image is no
+    # more likely to have it. The vendored fonts were going out as
+    # application/octet-stream. Browsers load them anyway, because @font-face trusts the
+    # format() hint over the header, so this is not what a broken page would look like;
+    # it is what a correctly typed response looks like, registered once rather than
+    # depended on being present.
+    mimetypes.add_type("font/woff2", ".woff2")
+
     app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
 
     @app.get("/")

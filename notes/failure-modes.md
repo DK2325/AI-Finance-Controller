@@ -1415,3 +1415,85 @@ specific wrong way, at a moment when something was watching — and what was wat
 verification of an unrelated fix. **Checking one thing properly is how the next thing gets
 found**, which is an argument for verifying rather than asserting that has nothing to do
 with the thing being verified.
+
+#### And the next thing it found: the engine that runs first was never given the bound
+
+The connect timeout above went into `ledgerloop/db.py`. There are two engines in this
+project. The other one is built by `engine_from_config` in the alembic environment, it had
+no `connect_args` at all, and it is the one that runs *first* — `api/main.py` applies
+migrations inside the lifespan, before a single route is mounted.
+
+That difference matters more than it sounds. An unbounded connect in the application engine
+makes a request hang. An unbounded connect in the migration engine means **the service
+never finishes starting**: no routes, no `/health`, no answer of any kind. And nothing
+raises while it happens, so the `try/except` that makes a migration failure non-fatal never
+runs.
+
+> **A migration that can hang is not a non-fatal migration.** Non-fatal and non-terminating
+> are different properties, and only one of them had a test.
+
+Measured on Windows against a port with nothing listening on it: `connect()` had not
+returned after ninety seconds, sitting in psycopg's connect loop, while a plain blocking
+socket to the same port was refused in two. **The deadline lives in `connect_timeout` and
+in no other place** — without it libpq is never told to give up, and the table above is
+incomplete in a way that matters: "refused is fast" is true of a blocking connect and not
+true of this path.
+
+**The table also reproduced itself, unprompted, while this was being fixed.** With Docker
+Desktop running and no container up, `localhost:5432` did not refuse. It timed out on both
+resolved addresses:
+
+```
+- host: 'localhost', port: 5432, hostaddr: '::1':       connection timeout expired
+- host: 'localhost', port: 5432, hostaddr: '127.0.0.1': connection timeout expired
+```
+
+Half-open, twice, on an ordinary developer machine doing nothing unusual. The bound is now
+imported from `ledgerloop/db.py` rather than repeated, and the guard asserts it over *every*
+engine the repository builds rather than the two that exist today — because the defect it
+replaces is a second engine that was missed when the first one was fixed.
+
+#### The reason it was misdiagnosed: the log had been switched off by the code under test
+
+The fix above was verified in isolation — `command.upgrade` raised in 5.43s where it had
+previously never returned. The server was then started, and it printed:
+
+```
+INFO:     Started server process
+INFO:     Waiting for application startup.
+```
+
+and nothing more. Which reads, unmistakably, as *still hanging*. It was not hanging. It was
+serving `/` in ten milliseconds and answering `/health` in five seconds with a correct
+`database: false`.
+
+`env.py` calls `fileConfig(config.config_file_name)`, and `disable_existing_loggers`
+defaults to `True`. Harmless for as long as migrations only ever ran from a terminal, where
+there are no other loggers worth keeping. It stopped being harmless the moment they moved
+inside the lifespan: uvicorn builds its loggers first, so applying migrations switched off
+the running server's logging for the rest of the process.
+
+> **A silent service and a hung service are the same observation.** Every instrument still
+> reads normal, because the instrument is what stopped.
+
+The absence of a log line was not weak evidence here. It was *manufactured* evidence,
+produced by the code being diagnosed — which is the worst kind, because it does not look
+like an artifact, it looks like a result. Two of the three defects on this page were found
+only after noticing that the thing reporting the failure was itself broken.
+
+#### A third, in the same breath: the line that reported the state was below the level
+
+With logging restored, the line `api/main.py` writes to say whether migrations succeeded
+still did not appear. `alembic.ini` pins the root logger to `WARNING`, and
+`logging.getLogger("ledgerloop.startup")` has no level of its own, so it inherited it. The
+report was formatted and discarded — on every deploy, in the one place someone would look
+to find out whether the schema had been applied. It has its own level now, set on that
+logger rather than by raising the root, which would change what every other library in the
+process is allowed to say.
+
+**All three were only reachable because the diagnosis was done with the database
+deliberately absent.** Postgres was available by then and starting it would have turned
+every symptom green: migrations would have applied, the hang would not have occurred, and
+the two silenced instruments would have gone on being silent about a success instead of a
+failure. **A fix verified only against the working case is a fix verified against the case
+that was never broken.**

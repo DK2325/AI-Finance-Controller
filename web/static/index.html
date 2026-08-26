@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LedgerLoop — reconciliation that knows when it is wrong</title>
+<link rel="preload" href="/assets/fonts/newsreader-latin.woff2" as="font"
+      type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/inter-latin.woff2" as="font"
+      type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
@@ -21,6 +25,7 @@
   <button type="button" class="tab" data-screen="review">Review queue</button>
   <button type="button" class="tab" data-screen="upload">Run a batch</button>
   <button type="button" class="tab" data-screen="chaos">Chaos</button>
+  <span class="tab-ink" id="tab-ink" aria-hidden="true"></span>
 </nav>
 
 <main class="wrap" id="app">
@@ -30,6 +35,7 @@
 <template id="review-template">
   <section class="panel">
     <div class="panel-head">
+      <p class="eyebrow">Evidence</p>
       <h2>Review queue</h2>
       <p class="sub">
         Every exception, with the rows the decision was made from. Nothing here is
@@ -57,6 +63,7 @@
 <template id="upload-template">
   <section class="panel">
     <div class="panel-head">
+      <p class="eyebrow">Batch</p>
       <h2>Run a batch</h2>
       <p class="sub">
         The demo batch is one click and needs no files. Uploading your own runs the same
@@ -108,6 +115,7 @@
 
   <section class="panel">
     <div class="panel-head">
+      <p class="eyebrow">01 &mdash; Operating point</p>
       <h2>Choose the operating point</h2>
       <p class="sub">
         The system does not choose how much risk you take. You do — and every choice
@@ -199,6 +207,7 @@
 
   <section class="panel">
     <div class="panel-head">
+      <p class="eyebrow">02 &mdash; Exceptions</p>
       <h2>What it could not resolve</h2>
       <p class="sub">
         Every settlement is accounted for exactly once — matched, or an exception with a
@@ -219,6 +228,7 @@
 <template id="chaos-template">
   <section class="panel">
     <div class="panel-head">
+      <p class="eyebrow">Adversarial</p>
       <h2>Break it on purpose</h2>
       <p class="sub">
         Name a corruption this system was never built for. It is injected into the bank

@@ -228,7 +228,12 @@ function spark(svg, values, currentIndex, rising) {
 
   const path = values.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`)
     .join(" ");
-  const colour = rising ? "#b3261e" : "#0d7a4a";
+  /* Read out of app.css rather than repeated here. These same two colours are the
+     card's left edge and the trend arrow beside it, and a sparkline that disagrees
+     with the border it sits inside is the kind of drift nobody notices for weeks. */
+  const palette = getComputedStyle(document.documentElement);
+  const colour = palette.getPropertyValue(rising ? "--bad" : "--good").trim() ||
+    (rising ? "#9d2b26" : "#16624a");
 
   /* vector-effect="non-scaling-stroke" is the whole reason this is legible on a shared
      screen. The SVG uses preserveAspectRatio="none" so it stretches to the card width,
@@ -243,6 +248,22 @@ function spark(svg, values, currentIndex, rising) {
        stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>` +
     `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4.5" fill="${colour}"
        vector-effect="non-scaling-stroke" stroke="#fff" stroke-width="2"/>`;
+
+  /* Drawn once per sparkline, not once per operating point. A line that redraws itself
+     every time the track is clicked is asking to be watched, and it is not the thing that
+     changed -- the marker is. Two of these run at a time and the shape is identical on
+     every redraw, so the second play would be pure decoration. */
+  if (!svg.dataset.drawn) {
+    svg.dataset.drawn = "1";
+    const line = svg.querySelector("path");
+    const length = line.getTotalLength();
+    line.style.strokeDasharray = String(length);
+    line.style.strokeDashoffset = String(length);
+    requestAnimationFrame(() => {
+      line.style.transition = "stroke-dashoffset 620ms cubic-bezier(.22,.7,.24,1)";
+      line.style.strokeDashoffset = "0";
+    });
+  }
 }
 
 /* ---------------------------------------------------------------- update */
@@ -255,9 +276,21 @@ function update() {
     tick.setAttribute("aria-current", String(i === state.index))
   );
 
+  /* A figure that moved lifts and fades in; one that did not is left alone, so the eye
+     is sent to the difference rather than to the whole panel. Deliberately a step and not
+     a count-up: the operating points are discrete, and a number tweening between them
+     would animate a continuity the calibration does not have -- the same lie a smooth
+     slider would tell. Skipped on the first paint, where every field goes from an em dash
+     to a number and animating all of them at once says nothing at all. */
   const set = (name, value) => {
     const el = document.querySelector(`[data-bind="${name}"]`);
-    if (el) el.textContent = value;
+    if (!el) return;
+    const before = el.textContent;
+    el.textContent = value;
+    if (before === "\u2014" || before === String(value)) return;
+    el.classList.remove("changed");
+    void el.offsetWidth;  /* forces a reflow, which restarts the animation */
+    el.classList.add("changed");
   };
 
   set("coverage", fmtPct(point.coverage));
@@ -346,12 +379,14 @@ boot();
  * Screens two and three: the review queue, and running a batch.
  * ========================================================================== */
 
-const screens = { exceptions: [] };
+const screens = { exceptions: [], current: "dashboard" };
 
 function switchTo(name) {
   document.querySelectorAll(".tab").forEach((tab) =>
     tab.setAttribute("aria-current", String(tab.dataset.screen === name))
   );
+  screens.current = name;
+  moveTabInk(name);
   if (name === "dashboard") render(state.data);
   else if (name === "review") renderReview();
   else if (name === "chaos") renderChaos();
@@ -361,6 +396,25 @@ function switchTo(name) {
 document.querySelectorAll(".tab").forEach((tab) =>
   tab.addEventListener("click", () => switchTo(tab.dataset.screen))
 );
+
+/* One rule that slides between the tabs rather than four that blink on and off. The
+   position has to come from the browser because only the browser knows how wide "Review
+   queue" renders -- and that width changes twice: once on resize, and once when Inter
+   finishes loading and the fallback metrics stop applying. Without the fonts.ready pass
+   the rule sits at the width of a font nobody is looking at. */
+function moveTabInk(name) {
+  const ink = document.getElementById("tab-ink");
+  const active = document.querySelector('.tab[data-screen="' + name + '"]');
+  if (!ink || !active) return;
+  ink.style.setProperty("--ink-x", active.offsetLeft + "px");
+  ink.style.setProperty("--ink-w", active.offsetWidth + "px");
+}
+
+moveTabInk(screens.current);
+window.addEventListener("resize", () => moveTabInk(screens.current));
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => moveTabInk(screens.current));
+}
 
 /* ---------------------------------------------------------------- review */
 
