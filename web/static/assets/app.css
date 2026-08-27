@@ -167,9 +167,29 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
 
 /* Each screen is rebuilt by replacing innerHTML, so the entrance replays on every tab
    switch without a line of JavaScript asking it to. */
-#app > * { animation: rise var(--mid) var(--ease) both; }
-#app > *:nth-child(2) { animation-delay: 45ms; }
-#app > *:nth-child(3) { animation-delay: 90ms; }
+#app > *:not(.reveal) { animation: rise var(--mid) var(--ease) both; }
+#app > *:nth-child(2):not(.reveal) { animation-delay: 45ms; }
+#app > *:nth-child(3):not(.reveal) { animation-delay: 90ms; }
+
+/* Below the fold, arrival is tied to reaching the thing rather than to the page loading.
+ *
+ * The exclusion above is not a style preference, it is the only way the two can coexist:
+ * an animation with `both` fill keeps asserting its end state after it finishes, and an
+ * animated opacity beats a declared one -- so a panel carrying the entrance animation can
+ * never be held at opacity 0 by a class. Whichever mechanism owns an element owns it
+ * alone.
+ *
+ * .reveal is only ever added by script. A browser with no JavaScript, or one where the
+ * observer never fires, therefore shows everything rather than showing nothing, which is
+ * the correct way round for a defect in a progressive enhancement.
+ */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.reveal.in { opacity: 1; transform: none; }
 
 /* A figure that changed lifts and fades in; a figure that did not is left alone. It is
    deliberately a step and not a count-up. Isotonic calibration gives a step function and
@@ -180,103 +200,270 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
+    /* The delays matter as much as the durations here. A reveal whose transition is
+       instant but still waits 45ms per item is a stagger with the motion taken out --
+       the content still arrives late, which is the part that was objectionable. */
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
 }
 
-/* ------------------------------------------------------------------ header */
+/* ------------------------------------------------------------------- shell */
 
-.top {
+/* Two columns: a rail that never moves, and everything else.
+ *
+ * The masthead used to be a band across the top with the four screens in a strip
+ * underneath it, which spent the most valuable region of the page on a title nobody
+ * needs to read twice and pushed the run itself below the fold. Folded onto its side it
+ * costs 240px of width -- which this layout has, because every panel here is a column of
+ * prose and figures with a comfortable measure, not a wide table -- and it buys three
+ * things: the four screens are all visible without hunting, the current one is stated
+ * rather than inferred from an underline, and the run being looked at is on screen at
+ * all times instead of in a footer.
+ *
+ * Same ink, same single gold rule, same type. Nothing here is a new colour.
+ */
+.shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+/* Keyboard users reach the run without tabbing the whole rail first. Off-screen until
+   focused, then placed over the content rather than shifting it. */
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 10px 16px;
+  background: var(--card);
+  color: var(--accent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+}
+.skip:focus { left: 12px; top: 12px; }
+
+/* -------------------------------------------------------------------- rail */
+
+.rail {
+  position: sticky;
+  top: 0;
+  /* Both of these are load-bearing for the stickiness, not sizing preferences. A grid
+     item defaults to align-self: stretch, which makes it as tall as the row and leaves
+     sticky nothing to move within; an explicit height opts out of the stretch, and
+     align-self: start says so rather than relying on the height to imply it. */
+  align-self: start;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: var(--header);
   color: #f4f1ea;
   border-top: 3px solid var(--gold);
-  padding: 30px 0 26px;
+  padding: 26px 0 18px;
+  overflow-y: auto;
 }
-.top h1 {
+
+.brand { padding: 0 22px 22px; }
+.brand h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: 27px;
   font-weight: 400;
   letter-spacing: -0.015em;
   line-height: 1.1;
 }
-.top h1 span { color: var(--gold); }
+.brand h1 span { color: var(--gold); }
 
 .tagline {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   font-family: var(--font-display);
-  font-size: 17.5px;
-  color: #b9b3a4;
-  letter-spacing: .005em;
+  font-size: 14.5px;
+  line-height: 1.4;
+  color: #a8a294;
 }
 
-.badges { margin-top: 18px; display: flex; gap: 7px; flex-wrap: wrap; }
-.badge {
-  font-size: 11.5px;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  font-weight: 500;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .05);
-  color: #cfc9ba;
-  border: 1px solid rgba(255, 255, 255, .13);
-  white-space: nowrap;
-}
-.badge.live {
-  background: rgba(60, 160, 115, .14);
-  border-color: rgba(90, 195, 145, .34);
-  color: #9adcbb;
-}
-.badge.mock {
-  background: rgba(200, 140, 50, .14);
-  border-color: rgba(220, 165, 80, .34);
-  color: #e8c58c;
-}
+/* --------------------------------------------------------------- rail: nav */
 
-/* -------------------------------------------------------------------- tabs */
+.nav { position: relative; display: flex; flex-direction: column; }
 
-.tabs {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  display: flex;
-  gap: 2px;
-  padding-top: 14px;
-  background: var(--paper);
-  border-bottom: 1px solid var(--line);
-}
 .tab {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
   background: none;
   border: 0;
-  padding: 10px 16px 12px;
+  padding: 11px 22px;
   font-family: inherit;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: .085em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  text-align: left;
+  color: #8f897c;
   cursor: pointer;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.tab:hover { color: #ded8ca; background: rgba(255, 255, 255, .04); }
+.tab[aria-current="true"] { color: #f6f2e8; background: rgba(255, 255, 255, .06); }
+
+/* The numbering is not decoration: these four screens are meant to be walked in order,
+   and a reviewer who lands on 03 can see there is an 01 they skipped. */
+.nav-key {
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  color: #6a6559;
+  font-variant-numeric: tabular-nums lining-nums;
   transition: color var(--fast) var(--ease);
 }
-.tab:hover { color: var(--ink); }
-.tab[aria-current="true"] { color: var(--ink); }
+.tab[aria-current="true"] .nav-key { color: var(--gold); }
 
-/* One rule that slides between the tabs rather than four that switch on and off. The
-   position comes from JavaScript because only the browser knows how wide a word is. */
-.tab-ink {
+/* One rule that slides down the rail rather than four that switch on and off. The
+   position comes from JavaScript because only the browser knows how tall a row is once
+   the font has loaded. Both axes are published on every move, and the narrow layout at
+   the bottom of this section re-reads the same custom properties horizontally -- so the
+   orientation is a CSS decision and the script does not have to know the viewport. */
+.nav-ink {
   position: absolute;
   left: 0;
-  bottom: -1px;
-  height: 2px;
-  background: var(--accent);
-  width: var(--ink-w, 0);
-  transform: translateX(var(--ink-x, 0));
-  transition: transform var(--mid) var(--ease), width var(--mid) var(--ease);
+  top: 0;
+  width: 2px;
+  height: var(--ink-h, 0);
+  background: var(--gold);
+  transform: translateY(var(--ink-y, 0));
+  transition: transform var(--mid) var(--ease), height var(--mid) var(--ease);
   pointer-events: none;
+}
+
+/* -------------------------------------------------------------- rail: foot */
+
+.rail-foot {
+  margin-top: auto;
+  padding: 18px 22px 0;
+  border-top: 1px solid rgba(255, 255, 255, .09);
+  font-size: 12px;
+  color: #7e7869;
+}
+.rail-run { margin: 0 0 9px; line-height: 1.5; overflow-wrap: anywhere; }
+.rail-links { margin: 0; display: flex; gap: 14px; }
+.rail-links a { color: #a29c8d; text-decoration-color: rgba(255, 255, 255, .22); }
+.rail-links a:hover { color: var(--gold); }
+
+/* ----------------------------------------------------------------- content */
+
+.content { min-width: 0; display: flex; flex-direction: column; }
+
+/* A slim bar rather than a second masthead. It carries two things and no more: where
+   you are, and what the service currently is. */
+/* The inner .wrap is the point of this element. The bar spans the whole content column
+   while the panels below are a centred 1080 inside it, so a bar padded to its own edges
+   put the label 60px to the left of the card it labels and the badges 28px to the right
+   of it. Nothing was misaligned by enough to look like a bug; it just made the bar read
+   as a separate strip floating above the page instead of belonging to it. */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 13px 0;
+  background: rgba(246, 244, 240, .93);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+}
+.crumb {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* #app grows so the colophon is pushed to the bottom of the viewport on the two short
+   screens. Before this, Run a batch ended two-thirds of the way down and left 300px of
+   bare paper under it -- which does not read as breathing room, it reads as a page that
+   failed to finish loading. */
+main#app { flex: 1 0 auto; padding-top: 2px; padding-bottom: 40px; }
+
+.colophon { margin-top: auto; }
+.colophon .wrap {
+  padding: 14px 24px 30px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--ink-3);
+  letter-spacing: .015em;
+}
+
+/* ------------------------------------------------------------------ badges */
+
+/* These sat on the dark masthead and were coloured for it. On paper they are restated
+   for this surface rather than left inheriting contrast tuned for the other one -- and
+   the two state variants reuse the wash tokens the panels already use, so a live badge
+   and a settled-with-no-model-call pill are the same green rather than two greens. */
+/* Tightened until the five of them clear one row inside the content measure. They were
+   spilling onto a third line and turning the bar into a block. */
+.badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.badge {
+  font-size: 11px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.badge.live { background: var(--good-wash); border-color: #cfe3d8; color: var(--good); }
+.badge.mock { background: var(--warn-wash); border-color: #eddcc2; color: var(--warn); }
+
+/* ---------------------------------------------------------- shell, narrow */
+
+/* Below this the rail is wider than the content it would leave, so it unfolds back into
+   a band: same element, same markup, no second navigation to keep in step. */
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .rail {
+    position: static;
+    height: auto;
+    padding: 20px 0 0;
+    overflow: visible;
+  }
+  .brand { padding: 0 20px 16px; }
+  .nav { flex-direction: row; overflow-x: auto; }
+  .tab { width: auto; white-space: nowrap; padding: 11px 16px 13px; }
+  .nav-ink {
+    top: auto;
+    bottom: 0;
+    width: var(--ink-w, 0);
+    height: 2px;
+    transform: translateX(var(--ink-x, 0));
+    transition: transform var(--mid) var(--ease), width var(--mid) var(--ease);
+  }
+  .rail-foot {
+    margin-top: 0;
+    padding: 13px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+  }
+  .rail-run { margin: 0; }
 }
 
 /* ------------------------------------------------------------------- panel */
@@ -286,10 +473,34 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 30px 32px;
-  margin: 26px 0;
+  padding: 34px 40px;
+  margin: 28px 0;
 }
-@media (max-width: 640px) { .panel { padding: 22px 20px; } }
+@media (max-width: 640px) { .panel { padding: 24px 22px; } }
+
+/* Title left, standfirst right, rather than a 68ch paragraph stopping a third of the
+   way across a card and leaving the rest blank on every screen. The measure is right;
+   putting it in a box nearly twice its width and leaving the remainder empty was not. */
+.panel-head {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 4px 48px;
+  align-items: start;
+  margin-bottom: 30px;
+}
+.head-title, .head-note { min-width: 0; }
+.head-note .sub {
+  font-size: 16.5px;
+  line-height: 1.62;
+  max-width: 58ch;
+}
+.head-note .sub.batch-note { font-size: 14px; line-height: 1.62; }
+.head-note .sub:last-child { margin-bottom: 0; }
+
+@media (max-width: 900px) {
+  .panel-head { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .head-note { margin-top: 14px; }
+}
 
 .eyebrow {
   margin: 0 0 10px;
@@ -311,12 +522,13 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
 .panel-head h2 {
   margin: 0 0 8px;
   font-family: var(--font-display);
-  font-size: 27px;
+  font-size: 29px;
   font-weight: 400;
-  letter-spacing: -0.012em;
-  line-height: 1.2;
+  letter-spacing: -0.016em;
+  line-height: 1.14;
+  text-wrap: balance;
 }
-.sub { margin: 0 0 22px; color: var(--ink-2); font-size: 15.5px; max-width: 68ch; }
+.sub { margin: 0 0 18px; color: var(--ink-2); font-size: 15.5px; max-width: 60ch; }
 .sub.batch-note {
   font-size: 13.5px; color: var(--ink-3); margin-top: -14px; max-width: 76ch;
 }
@@ -346,17 +558,43 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
   line-height: 1;
   color: var(--ink);
 }
-.chosen-figure .label {
+.chosen-figure .label,
+.chosen-point .label {
   color: var(--ink-3);
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: .12em;
   text-transform: uppercase;
 }
+
+/* The right end of this row was empty, and the one quantity missing from the screen was
+   the operating point itself -- the number every other figure on the row is a consequence
+   of. Set quietly and in the mono face: it is a parameter, not a headline. */
+.chosen-point {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-end;
+  align-self: center;
+  margin-left: auto;
+  text-align: right;
+}
+.chosen-point-v {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.01em;
+}
+@media (max-width: 720px) {
+  .chosen-point { margin-left: 0; align-items: flex-start; text-align: left; }
+}
 .chosen-detail {
   color: var(--ink-2);
   font-size: 15.5px;
   align-self: center;
+  flex: 1 1 auto;
   padding-left: 26px;
   border-left: 1px solid var(--line-2);
   max-width: 46ch;
@@ -369,12 +607,15 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
 /* --------------------------------------------------------------- the track */
 
 .track-wrap { margin: 24px 0 28px; }
+/* Given a baseline that reads as an axis and a faint ground, so the ticks sit ON
+   something instead of floating in the page. */
 .track {
   position: relative;
   display: flex;
   align-items: flex-end;
-  height: 58px;
-  border-bottom: 2px solid var(--line);
+  height: 62px;
+  background: linear-gradient(180deg, transparent 38%, rgba(28, 63, 114, .035));
+  border-bottom: 2px solid #d3cabb;
   gap: 0;
 }
 /* Each tick's flex-grow is the step size, so a 732-settlement jump is visibly wide and a
@@ -397,19 +638,37 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
   bottom: 0;
   width: 3px;
   height: 14px;
-  background: var(--ink-3);
+  background: var(--accent-2);
+  opacity: .48;
   border-radius: 2px 2px 0 0;
   transition: height var(--mid) var(--ease), background var(--fast) var(--ease),
-    width var(--fast) var(--ease);
+    opacity var(--fast) var(--ease), width var(--fast) var(--ease);
 }
-.tick:hover::after { background: var(--accent-2); height: 24px; }
+.tick:hover::after { opacity: 1; height: 26px; }
 .tick[aria-current="true"]::after {
-  background: var(--accent); height: 42px; width: 5px; right: -2px;
+  background: var(--accent); opacity: 1; height: 44px; width: 5px; right: -2px;
 }
-.tick[data-past-floor="true"]::after { background: var(--bad); }
+.tick[data-past-floor="true"]::after { background: var(--bad); opacity: .7; }
+.tick[data-past-floor="true"]:hover::after,
+.tick[data-past-floor="true"][aria-current="true"]::after { opacity: 1; }
 .track:focus-within { outline: 2px solid var(--accent-2); outline-offset: 6px; border-radius: 3px; }
-.track-note.above { margin: 0 0 16px; font-size: 14.5px; color: var(--ink-2); max-width: 78ch; }
-.track-foot { margin: 12px 0 0; font-size: 13.5px; color: var(--ink-3); }
+.track-note.above {
+  margin: 0 0 20px;
+  padding-left: 16px;
+  border-left: 2px solid var(--line);
+  font-size: 14px;
+  line-height: 1.68;
+  color: var(--ink-2);
+  max-width: 74ch;
+}
+.track-note.above strong { color: var(--ink); }
+.track-foot {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-3);
+  max-width: 76ch;
+}
 
 /* The left endpoint is not a step between choices -- it is where the range of choice
    begins. Scaling it by its 2,495 settlements pushed every real step into the right third
@@ -437,6 +696,7 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
   border: 1px solid var(--line);
   border-radius: 999px;
   pointer-events: none;
+  z-index: 3;
   font-variant-numeric: tabular-nums;
   transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease);
 }
@@ -446,9 +706,30 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
 /* -------------------------------------------------------- three consequences */
 
 .consequences { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+/* The three cards arrive one after another rather than as a block. The row is a
+   comparison, and dealing them out is the difference between "here is a group" and "here
+   are three things to weigh against each other". The container itself stops fading so the
+   two do not compound into a double fade. */
+.consequences.reveal { opacity: 1; transform: none; transition: none; }
+.consequences.reveal .cons {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease),
+    box-shadow var(--fast) var(--ease), background var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+.consequences.reveal.in .cons { opacity: 1; transform: none; }
+.consequences.reveal.in .cons:nth-child(2) { transition-delay: 90ms; }
+.consequences.reveal.in .cons:nth-child(3) { transition-delay: 180ms; }
 @media (max-width: 820px) { .consequences { grid-template-columns: 1fr; } }
 
+/* The three consequence cards are the only things on this page you are meant to compare
+   against each other, so they are the ones that answer to the pointer. A 2px lift and the
+   card surface coming forward -- enough to say "this one", not enough to be a effect. */
 .cons {
+  transition: transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease),
+    background var(--fast) var(--ease), border-color var(--fast) var(--ease);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 17px 18px;
@@ -465,6 +746,13 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
   letter-spacing: -0.02em;
   line-height: 1.15;
 }
+.cons:hover {
+  transform: translateY(-2px);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  border-color: #d3cbbe;
+}
+.cons:hover .spark { opacity: 1; }
 .cons.alarm .cons-value { color: var(--bad); }
 .cons-unit { font-size: 13.5px; color: var(--ink-3); margin-top: 3px; }
 .spark { width: 100%; height: 44px; margin-top: 12px; display: block; }
@@ -489,7 +777,6 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
   background: var(--accent-wash);
   border-left: 3px solid var(--accent);
   border-radius: 0 var(--radius) var(--radius) 0;
-  max-width: 84ch;
 }
 .divergence strong { color: var(--ink); }
 
@@ -500,16 +787,26 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
   display: flex; justify-content: space-between; align-items: baseline;
   gap: 16px; flex-wrap: wrap;
 }
-.precision-head h3 { margin: 0; font-size: 15px; color: var(--ink-2); font-weight: 600; }
-.precision-value { font-size: 22px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.precision-head h3 {
+  margin: 0; font-size: 11.5px; font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.precision-value {
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 400;
+  letter-spacing: -0.012em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
 .precision-value .ci {
-  font-size: 13.5px; color: var(--ink-3); font-weight: 400; margin-left: 8px;
+  font-family: var(--font-ui);
+  font-size: 13px; color: var(--ink-3); font-weight: 400; margin-left: 10px;
 }
 
 .precision-bar {
   position: relative;
-  height: 22px;
-  margin: 14px 0 8px;
+  height: 26px;
+  margin: 18px 0 10px;
   background: linear-gradient(90deg, #f6e3e0 0%, #f8efdd 55%, #e4f0e9 100%);
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
@@ -548,44 +845,115 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
 
 /* ----------------------------------------------------------------- reasons */
 
+/* The claim this panel makes is a ratio. Stated only in a sentence it has to be taken on
+   trust; drawn, it is checkable at a glance -- and it occupies the column beside the
+   heading, which the two-column head otherwise leaves empty. */
+.split { margin-top: 24px; max-width: 330px; }
+.split-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+}
+.split-bar span { width: 0; transition: width 750ms var(--ease); }
+.split-free { background: var(--good); }
+.split-llm { background: var(--accent); }
+
+.split-legend {
+  margin-top: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.split-key { display: flex; align-items: center; gap: 9px; }
+.split-key i {
+  width: 9px; height: 9px; border-radius: 2px; flex: 0 0 auto; display: inline-block;
+}
+.split-key.free i { background: var(--good); }
+.split-key.llm i { background: var(--accent); }
+.split-key strong {
+  margin-left: 4px; color: var(--ink); font-weight: 600;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
 .reasons { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 /* The code column sizes to its content so the pill stays on the same line. At 210px the
    pill wrapped underneath and read as a rendering artefact rather than a label. */
 .reason {
   display: grid;
-  grid-template-columns: max-content 80px 1fr;
-  gap: 18px;
-  align-items: baseline;
-  padding: 13px 16px;
+  grid-template-columns: max-content 74px 150px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 15px 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--paper);
   transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
 }
 .reason:hover { border-color: #d3cbbe; background: var(--card); }
-@media (max-width: 900px) { .reason { grid-template-columns: 1fr; gap: 4px; } }
+@media (max-width: 1080px) {
+  .reason { grid-template-columns: max-content 74px minmax(0, 1fr); }
+  .reason-share { display: none; }
+}
+@media (max-width: 900px) {
+  .reason { grid-template-columns: 1fr; gap: 4px; }
+  .reason-n { flex-direction: row; align-items: baseline; gap: 8px; }
+}
 .reason-code { display: flex; align-items: baseline; gap: 9px; white-space: nowrap; }
 .reason code {
   font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; color: var(--ink);
 }
-.reason .count { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; }
-.reason .why { font-size: 13.5px; color: var(--ink-2); }
+.reason-n {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+.reason .count {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-weight: 600;
+  font-size: 17px;
+  line-height: 1.1;
+}
+.reason-pct {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* The share of exceptions this code accounts for. Drawn to the true fraction of the
+   total, not normalised to the largest -- a bar scaled to its neighbour reads as a
+   percentage and is not one. */
+.reason-share {
+  margin-top: 7px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
+  overflow: hidden;
+}
+.reason-share-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  transition: width 700ms var(--ease);
+}
+.reason-share-fill.free { background: var(--good); opacity: .8; }
+.reason-share-fill.llm { background: var(--accent); opacity: .8; }
+
+.reason .why { font-size: 13.5px; line-height: 1.6; color: var(--ink-2); }
 .pill {
   font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
   padding: 3px 9px; border-radius: 999px; white-space: nowrap;
 }
 .pill.free { background: var(--good-wash); color: var(--good); }
 .pill.llm { background: var(--accent-wash); color: var(--accent); }
-
-/* ------------------------------------------------------------------ footer */
-
-.foot { padding: 10px 24px 48px; color: var(--ink-3); font-size: 13px; }
-.foot p {
-  margin: 0; padding-top: 16px; border-top: 1px solid var(--line);
-  letter-spacing: .02em;
-}
-.foot a { color: var(--ink-2); text-decoration-color: var(--line); }
-.foot a:hover { color: var(--accent); }
 
 /* ------------------------------------------------------------ review queue */
 
@@ -658,7 +1026,11 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
 
 /* Side by side, because the comparison IS the work. They arrive in sequence, left to
    right, which is the order they are meant to be read in. */
-.ev-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.ev-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
 @media (max-width: 760px) { .ev-cards { grid-template-columns: 1fr; } }
 .ev-card {
   border: 1px solid var(--line); border-radius: var(--radius); padding: 14px;
@@ -682,13 +1054,20 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
   border-left: 3px solid var(--warn);
 }
 .ev-card.absent p { margin: 0; font-size: 13.5px; color: #74490f; }
+/* Wrapping is the point of the flex-wrap here, and it is a correctness property rather
+   than a nicety: these rows carry identifiers of a length the layout does not control,
+   and a column narrow enough to clip one is a column that silently shows the wrong value.
+   A label with its value beneath it is fine. Half an identifier is not. */
 .ev-row {
-  display: flex; justify-content: space-between; gap: 10px; font-size: 13px;
-  padding: 4px 0; border-bottom: 1px dashed var(--line-2);
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 10px;
+  font-size: 13px; padding: 4px 0; border-bottom: 1px dashed var(--line-2);
 }
 .ev-row:last-child { border-bottom: 0; }
 .ev-row dt { color: var(--ink-3); }
-.ev-row dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; font-weight: 500; }
+.ev-row dd {
+  margin: 0; margin-left: auto; font-variant-numeric: tabular-nums; text-align: right;
+  font-weight: 500; overflow-wrap: anywhere;
+}
 .ev-row dd strong { font-weight: 650; }
 .ev-narration {
   font-family: var(--font-mono); font-size: 11.5px; word-break: break-all; color: var(--ink);
@@ -771,7 +1150,20 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
 .primary:active { transform: none; box-shadow: none; }
 .primary.ghost { background: var(--card); color: var(--accent); border-color: #c5d1e6; }
 .primary.ghost:hover { background: var(--accent-wash); border-color: var(--accent); }
-.primary:disabled { opacity: .42; cursor: not-allowed; transform: none; box-shadow: none; }
+/* Not opacity. A ghost button at 42% opacity on paper is a button you cannot read, and
+   unreadable reads as broken rather than as not-yet. This one states its state: present,
+   legible, and obviously not the thing to press. */
+.primary:disabled,
+.primary.ghost:disabled {
+  opacity: 1;
+  background: var(--paper-2);
+  color: var(--ink-3);
+  border-color: var(--line);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.primary.ghost:disabled:hover { background: var(--paper-2); border-color: var(--line); }
 .hint { font-size: 13.5px; color: var(--ink-3); }
 .hint code { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-2); }
 
@@ -786,7 +1178,41 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
 .drop.filled { border-style: solid; border-color: var(--good); background: var(--good-wash); }
 .drop-title { font-size: 14.5px; font-weight: 600; }
 .drop-sub { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); }
-.drop input { margin-top: 9px; font-size: 12.5px; font-family: inherit; }
+/* ::file-selector-button rather than a hidden input behind a fake label. The native
+   control keeps its keyboard behaviour, its focus ring and its "no file chosen" text --
+   all of which a reimplementation has to get right again -- and only the button's paint
+   changes. The grey system button was the one thing on this page that belonged to a
+   different design. */
+.drop input[type="file"] {
+  margin-top: 10px;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  max-width: 100%;
+}
+.drop input[type="file"]::file-selector-button {
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  margin-right: 10px;
+  background: var(--card);
+  color: var(--accent);
+  border: 1px solid #c5d1e6;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.drop input[type="file"]::file-selector-button:hover {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+}
+.drop.filled input[type="file"]::file-selector-button {
+  color: var(--good);
+  border-color: #cfe3d8;
+}
 
 .job {
   margin-top: 22px; padding: 16px 18px; border: 1px solid var(--line);
@@ -913,23 +1339,31 @@ em { font-style: normal; font-weight: 600; color: var(--ink); }
    headline, and a reader who cannot tell whether a live demo is held out will assume it
    is not. */
 .heldout {
-  margin: 26px 0 -6px;
-  padding: 15px 18px;
-  border: 1px solid #b9dcc9;
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  gap: 8px 44px;
+  align-items: start;
+  margin: 28px 0 -2px;
+  padding: 20px 24px;
+  border: 1px solid #cfe3d8;
   border-left: 3px solid var(--good);
   border-radius: var(--radius);
   background: var(--good-wash);
-  color: #174534;
-  font-size: 14px;
-  line-height: 1.55;
+  color: #285e48;
+  font-size: 13.5px;
+  line-height: 1.68;
 }
 .heldout strong {
-  display: block;
-  margin-bottom: 3px;
+  margin: 0;
   font-family: var(--font-display);
   font-weight: 500;
-  font-size: 17px;
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: -0.012em;
   color: var(--good);
+}
+@media (max-width: 900px) {
+  .heldout { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 }
 .heldout-bad {
   border-color: #ecc9c6;

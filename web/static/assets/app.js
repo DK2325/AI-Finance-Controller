@@ -67,8 +67,13 @@ function render(data) {
   buildTrack();
   buildReasons(data);
 
-  document.getElementById("foot-run").textContent =
-    `run ${data.run_id} · batch ${data.batch_dir} · model ${data.model_version || "—"}`;
+  const colophon = document.getElementById("foot-run");
+  if (colophon) {
+    colophon.textContent =
+      `run ${data.run_id} · batch ${data.batch_dir} · model ${data.model_version || "—"}`;
+  }
+
+  armReveal();
 
   /* The held-out banner. Driven entirely by what the API reports about the batch, so a
      run over a non-held-out batch cannot render this and a held-out one cannot hide it.
@@ -173,6 +178,7 @@ function buildTrack() {
       if (size >= LABEL_AT) {
         const label = document.createElement("span");
         label.className = "tick-label";
+        label.dataset.size = String(size);
         label.textContent = `+${fmtInt(size)} in one step`;
         tick.appendChild(label);
       }
@@ -195,6 +201,8 @@ function buildTrack() {
       `From there, ${steps.length} steps ranging from ` +
       `${fmtInt(Math.min(...steps))} to ${fmtInt(Math.max(...steps))} settlements.`;
   }
+
+  trimTrackLabels();
 
   /* Keyboard: the track is a real control, not a decorative strip. */
   track.tabIndex = 0;
@@ -298,6 +306,12 @@ function update() {
   set("settlements", fmtInt(data.settlements));
   set("to_review", fmtInt(point.to_review));
 
+  /* The number the operating point actually IS. It was the one quantity the screen asked
+     you to choose and then never showed you -- everything else on this row is a
+     consequence of it. Four places, because that is the resolution the calibrator's steps
+     are separated by; more would imply distinctions the model does not draw. */
+  set("threshold", point.threshold.toFixed(4));
+
   set("to_review_v", fmtInt(point.to_review));
   set("wrong_money_v", rupees(point.wrong_money_paise));
   set("total_money", "₹" + point.total_money.split(".")[0]);
@@ -355,38 +369,180 @@ function buildReasons(data) {
     .filter((r) => !r.needs_llm)
     .reduce((sum, r) => sum + r.count, 0);
 
+  const llm = total - free;
+
   const el = document.querySelector('[data-bind="free_share"]');
   if (el) el.textContent = ((free / total) * 100).toFixed(1) + "%";
 
+  /* The headline claim of this panel is a ratio, and a ratio stated only in a sentence is
+     a ratio the reader has to take on trust. Drawn, it is checkable at a glance -- and it
+     fills the column beside the heading, which was empty. */
+  const split = document.getElementById("reason-split");
+
   list.innerHTML = data.reason_breakdown
-    .map(
-      (r) => `<li class="reason">
+    .map((r) => {
+      const share = (r.count / total) * 100;
+      return `<li class="reason">
         <div class="reason-code"><code>${r.code}</code>${
           r.needs_llm
             ? '<span class="pill llm">explained by model</span>'
             : '<span class="pill free">no model call</span>'
         }</div>
-        <div class="count">${fmtInt(r.count)}</div>
+        <div class="reason-n">
+          <span class="count">${fmtInt(r.count)}</span>
+          <span class="reason-pct">${share.toFixed(1)}%</span>
+        </div>
+        <div class="reason-share" role="img"
+             aria-label="${share.toFixed(1)} percent of exceptions">
+          <span class="reason-share-fill ${r.needs_llm ? "llm" : "free"}"
+                data-share="${share.toFixed(2)}"></span>
+        </div>
         <div class="why">${r.description}</div>
-      </li>`
-    )
+      </li>`;
+    })
     .join("");
+
+  /* Widths are applied a frame after the markup lands, so every bar grows from zero
+     rather than appearing at full length. The proportions are the message, and a bar that
+     is simply already there does not show a proportion, it shows a shape. */
+  requestAnimationFrame(() => {
+    if (split) {
+      split.hidden = false;
+      document.getElementById("split-free").style.width = (free / total) * 100 + "%";
+      document.getElementById("split-llm").style.width = (llm / total) * 100 + "%";
+      document.getElementById("split-free-n").textContent = fmtInt(free);
+      document.getElementById("split-llm-n").textContent = fmtInt(llm);
+    }
+    list.querySelectorAll(".reason-share-fill").forEach((fill) => {
+      fill.style.width = fill.dataset.share + "%";
+    });
+  });
 }
 
 boot();
+
+/* A label is drawn over the centre of its tick and is wider than most ticks are, so two
+   labelled steps close together overlap -- which is what was happening at the right-hand
+   end, where the last few steps are narrow and adjacent.
+
+   Measured after layout rather than predicted from the step size, because whether two
+   labels collide depends on the rendered width of the text, and that depends on the
+   viewport and on whether Inter has finished loading. Biggest step wins the space: the
+   labels are considered largest-first and one is kept only if it clears everything already
+   kept, so what survives a crowded stretch is the step actually worth pointing at.
+
+   Nothing is lost by hiding one. The step sizes are in the line under the track and in
+   every tick's aria-label; the label is a convenience, and a convenience that overlaps
+   another convenience is worth less than the space it takes. */
+function trimTrackLabels() {
+  const track = document.getElementById("track");
+  if (!track) return;
+  const labels = Array.from(track.querySelectorAll(".tick-label"));
+  if (!labels.length) return;
+
+  labels.forEach((label) => { label.hidden = false; });
+
+  requestAnimationFrame(() => {
+    const measured = labels
+      .map((el) => ({ el, box: el.getBoundingClientRect(), size: Number(el.dataset.size || 0) }))
+      .sort((a, b) => b.size - a.size);
+
+    const kept = [];
+    measured.forEach((entry) => {
+      const clashes = kept.some(
+        (k) => entry.box.left < k.box.right + 8 && k.box.left < entry.box.right + 8
+      );
+      if (clashes) entry.el.hidden = true;
+      else kept.push(entry);
+    });
+  });
+}
+
+/* Both of the things that change a label's width: the viewport, and the font arriving. */
+window.addEventListener("resize", trimTrackLabels);
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(trimTrackLabels);
+}
 
 /* ==========================================================================
  * Screens two and three: the review queue, and running a batch.
  * ========================================================================== */
 
+/* ------------------------------------------------------------------- reveal */
+
+/* Things below the fold arrive when you reach them rather than having already arrived
+   before you got there.
+ *
+ * Deliberately one-way and once-only. This says "here is the next thing" -- it is not an
+ * effect that replays, so nothing re-animates on the way back up, and anything already on
+ * screen when a tab opens is revealed on the spot rather than fading in under the cursor.
+ *
+ * The class is added here and never in the markup, so a browser without IntersectionObserver
+ * shows everything instead of nothing. The timeout is the same guarantee against an
+ * observer that is present but never fires -- the failure mode of a progressive enhancement
+ * has to be the content being visible. */
+const REVEAL = ".panel + .panel, .consequences, .divergence, .precision";
+
+let revealObserver = null;
+let revealAnswered = false;
+
+function armReveal() {
+  const app = document.getElementById("app");
+  if (!app || !("IntersectionObserver" in window)) return;
+
+  const targets = Array.from(app.querySelectorAll(REVEAL));
+  if (!targets.length) return;
+
+  if (!revealObserver) {
+    revealObserver = new IntersectionObserver(
+      (entries, observer) => {
+        revealAnswered = true;
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add("in");
+          observer.unobserve(entry.target);
+        });
+      },
+      { rootMargin: "0px 0px -6% 0px", threshold: 0.05 }
+    );
+  }
+
+  targets.forEach((el, i) => {
+    el.classList.add("reveal");
+    el.style.setProperty("--reveal-delay", Math.min(i, 4) * 60 + "ms");
+    revealObserver.observe(el);
+  });
+
+  /* The fallback is for an observer that never answers at all -- not a timer that shows
+     everything after a second and a half, which is what this was on the first pass and
+     which would have quietly cancelled the feature it was meant to protect. Anything on
+     screen at arm time produces a callback immediately, so in a working browser this flag
+     is set before the timeout is ever reached and the timeout does nothing. */
+  window.setTimeout(() => {
+    if (revealAnswered) return;
+    targets.forEach((el) => el.classList.add("in"));
+  }, 2000);
+}
+
 const screens = { exceptions: [], current: "dashboard" };
+
+/* The label the bar shows for each screen. Taken from the rail rather than repeated
+   here, so the two can never disagree about what a screen is called. */
+const screenTitle = (name) => {
+  const tab = document.querySelector('.tab[data-screen="' + name + '"]');
+  return tab ? tab.textContent.replace(/^\s*\d+\s*/, "").trim() : name;
+};
 
 function switchTo(name) {
   document.querySelectorAll(".tab").forEach((tab) =>
     tab.setAttribute("aria-current", String(tab.dataset.screen === name))
   );
   screens.current = name;
-  moveTabInk(name);
+  moveNavInk(name);
+
+  const crumb = document.getElementById("crumb");
+  if (crumb) crumb.textContent = screenTitle(name);
+
   if (name === "dashboard") render(state.data);
   else if (name === "review") renderReview();
   else if (name === "chaos") renderChaos();
@@ -397,23 +553,30 @@ document.querySelectorAll(".tab").forEach((tab) =>
   tab.addEventListener("click", () => switchTo(tab.dataset.screen))
 );
 
-/* One rule that slides between the tabs rather than four that blink on and off. The
-   position has to come from the browser because only the browser knows how wide "Review
-   queue" renders -- and that width changes twice: once on resize, and once when Inter
-   finishes loading and the fallback metrics stop applying. Without the fonts.ready pass
-   the rule sits at the width of a font nobody is looking at. */
-function moveTabInk(name) {
-  const ink = document.getElementById("tab-ink");
+/* One rule that slides along the rail rather than four that blink on and off. The
+   position has to come from the browser because only the browser knows how tall a row
+   sits or how wide "Review queue" renders -- and both change twice: once on resize, and
+   once when Inter finishes loading and the fallback metrics stop applying. Without the
+   fonts.ready pass the rule ends up sized to a font nobody is looking at.
+
+   Both axes are written every time. The rail is vertical above 900px and a horizontal
+   band below it, and which pair of properties is read is decided in the stylesheet --
+   so there is no viewport check here, and no way for the script's idea of the layout to
+   drift from the layout. */
+function moveNavInk(name) {
+  const ink = document.getElementById("nav-ink");
   const active = document.querySelector('.tab[data-screen="' + name + '"]');
   if (!ink || !active) return;
+  ink.style.setProperty("--ink-y", active.offsetTop + "px");
+  ink.style.setProperty("--ink-h", active.offsetHeight + "px");
   ink.style.setProperty("--ink-x", active.offsetLeft + "px");
   ink.style.setProperty("--ink-w", active.offsetWidth + "px");
 }
 
-moveTabInk(screens.current);
-window.addEventListener("resize", () => moveTabInk(screens.current));
+moveNavInk(screens.current);
+window.addEventListener("resize", () => moveNavInk(screens.current));
 if (document.fonts && document.fonts.ready) {
-  document.fonts.ready.then(() => moveTabInk(screens.current));
+  document.fonts.ready.then(() => moveNavInk(screens.current));
 }
 
 /* ---------------------------------------------------------------- review */
