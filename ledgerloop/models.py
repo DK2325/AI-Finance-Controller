@@ -114,6 +114,15 @@ class AuditRecord(Base):
     layer: Mapped[str] = mapped_column(String(32), nullable=False)
     decision: Mapped[str] = mapped_column(String(32), nullable=False)
 
+    # What it was decided ABOUT, and -- where a human gated it -- what they decided.
+    #
+    # `action` is separate from `decision` rather than folded into it. `decision` says what
+    # the pipeline did with the row and is always 'escalated' for a human gate, because
+    # filing a human verdict as 'matched' would let it be counted in the auto-match rate.
+    # The verdict itself is a different fact and needs somewhere of its own to live.
+    entity_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    action: Mapped[str | None] = mapped_column(String(32))
+
     # What went in. Hashes, not copies - the audit trail must not duplicate the ledger.
     input_row_hashes: Mapped[dict | None] = mapped_column(JSONB)
     feature_vector: Mapped[dict | None] = mapped_column(JSONB)
@@ -138,6 +147,10 @@ class AuditRecord(Base):
             "calibrated_confidence IS NULL OR (calibrated_confidence >= 0"
             " AND calibrated_confidence <= 1)",
             name="ck_audit_confidence_is_a_probability",
+        ),
+        CheckConstraint(
+            "action IS NULL OR action IN ('approve', 'reject', 'edit')",
+            name="ck_audit_records_action_enum",
         ),
     )
 

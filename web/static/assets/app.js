@@ -127,7 +127,10 @@ async function badges(data) {
     [data.calibrated ? `calibrated · ${data.calibration_method}` : "NOT calibrated",
       data.calibrated ? "live" : "mock"],
     [`${state.points.length} operating points`, ""],
-    [`${((free / total) * 100).toFixed(0)}% of exceptions settled with no model call`, "live"],
+    /* One decimal, matching the exceptions panel and the README. At toFixed(0) this
+       badge read 70% while the panel below it read 69.8% and the README said 69.77% --
+       three renderings of one number, two of them on screen together. */
+    [`${((free / total) * 100).toFixed(1)}% of exceptions settled with no model call`, "live"],
   ];
   if (service) {
     /* Name it. "model configured" is service-availability information sitting beside the

@@ -235,11 +235,23 @@ live site              schema fixed and REDEPLOYED; confirmed storing to postgre
                        six tables present, footer shows v1-test / data/test
 throughput             105 settlements/s at 24,750 rows, AMD Ryzen 5 5600H, six cores
                        reason job 10.1 rpm; parse 27.2 rpm -- quote the job, not "the" rate
-tests                  530 passing, ruff clean  (wall clock depends on whether a
-                       half-open 5432 is present -- each DB connect then costs the
-                       bounded 5s x 2 resolved addresses)
-                       (was reported as 507; the count was partly luck, see
-                        failure-modes.md "Guards that passed for the wrong reason")
+tests                  535 total, ruff clean. What a given machine sees depends on
+                       what it has, and all three counts are honest:
+                         535 passed            here -- dataset present, Postgres up
+                         507 passed, 28 skip   fresh clone after `docker compose up`
+                         506 passed, 29 skip   fresh clone, nothing started
+                       The 28 are tests/test_model.py, which needs
+                       runs/_datasets/train.csv -- a gitignored regenerable
+                       intermediate, so they skip until `ledgerloop train` has run.
+                       The 29th is the audit-trail round trip, which skips when no
+                       Postgres is reachable. Quote 507/28 to a reviewer: it is what
+                       the documented setup actually produces.
+                       Wall clock depends on whether a half-open 5432 is present --
+                       each DB connect then costs the bounded 5s x 2 resolved addresses.
+                       Not to be confused with the earlier 507: an unrelated episode
+                       where the total was reported as 507 and the count was partly
+                       luck -- failure-modes.md, "Guards that passed for the wrong
+                       reason". The 507 above is a skip-adjusted count, not that one.
 ```
 
 ## Environment: nothing to set up

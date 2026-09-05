@@ -213,17 +213,42 @@ def _persist(payload: dict, run_id: str, root: Path) -> tuple[str, str]:
                     "rows_exception": counts.get("exceptions", 0),
                 },
             )
+            # Every field here is one the record already carried and the INSERT used to
+            # drop. What survived was run_id, layer, decision, approver -- and `decision`
+            # is 'escalated' for approve, reject and edit alike, so two verdicts on two
+            # different exceptions produced rows that differed only by timestamp. The
+            # audit trail recorded that somebody decided something, which is the one thing
+            # an audit trail cannot be allowed to mean.
+            #
+            # `input_row_hashes` was the sharpest of them: it is a column on this table,
+            # the payload has always populated it, and it was still not written -- so the
+            # hash that ties a decision to the exact source row it saw was computed and
+            # discarded on every approval.
             conn.execute(
                 text(
                     "INSERT INTO audit_records "
-                    "(id, run_id, layer, decision, approver, created_at) "
+                    "(id, run_id, layer, decision, entity_id, action, "
+                    "input_row_hashes, input_tokens, output_tokens, "
+                    "approver, created_at) "
                     "VALUES (gen_random_uuid()::text, :run_id, :layer, :decision, "
-                    ":approver, now())"
+                    ":entity_id, :action, CAST(:input_row_hashes AS JSONB), "
+                    ":input_tokens, :output_tokens, :approver, now())"
                 ),
                 {
                     "run_id": payload["run_id"],
                     "layer": payload["layer"],
                     "decision": payload["decision"],
+                    "entity_id": payload["entity_id"],
+                    "action": payload["action"],
+                    # Zero, and stored rather than left NULL. A human gate calls no model,
+                    # and "cost nothing" is a fact about this decision; NULL would say
+                    # "not known", which is a different and weaker claim.
+                    "input_tokens": payload["input_tokens"],
+                    "output_tokens": payload["output_tokens"],
+                    # Bound as JSON text and cast, rather than handed a dict: psycopg
+                    # adapts a dict to hstore-ish parameters, not to jsonb, and the
+                    # column would take a string that is not JSON without complaint.
+                    "input_row_hashes": json.dumps(payload["input_row_hashes"]),
                     "approver": payload["approver"],
                 },
             )
