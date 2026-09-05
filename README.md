@@ -855,6 +855,12 @@ predictions after the fact.
 If the matcher can see the answer key, every number here is worthless — so this is
 enforced by `tests/test_import_lint.py`, which fails the build on a breach.
 
+**The synthetic data is checkable by hand.**
+[notes/worked-examples.md](notes/worked-examples.md) walks one instance of every one of the
+ten case types — the gateway row, the bank credit, the invoice, and the arithmetic that
+links them, copied from the CSVs. Fees, TDS and rounding are shown in integer paise, so a
+reviewer can confirm a settlement reconciles without running anything.
+
 ## Data integrity
 
 - **Money is `NUMERIC(14,2)`.** Never float. `tests/test_no_float_money.py` walks the

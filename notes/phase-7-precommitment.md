@@ -74,7 +74,7 @@ The scale run is complete and its numbers are in `notes/measurements/scale.json`
 
 ## 5. Two corrections to my own estimates, made by the scale run
 
-Recorded here because they were wrong in `notes/RESUME.md` and the corrections arrived
+Recorded here because they were wrong in an earlier working note and the corrections arrived
 before the seal broke:
 
 | estimated | measured |

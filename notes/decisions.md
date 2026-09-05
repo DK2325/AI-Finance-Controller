@@ -4,8 +4,7 @@ Running log. One entry per choice that a reviewer might reasonably have made dif
 
 ---
 
-## Phase 0 — Foundation (22 Aug 2026)
-
+## Phase 0 — Foundation
 ### Repo root is flat
 
 The repo root *is* `AI Finance Controller/`. Packages sit directly inside it rather than

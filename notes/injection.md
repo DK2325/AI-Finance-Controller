@@ -9,7 +9,7 @@ answer written down in this repo was wrong.
 
 ## The claim that was wrong
 
-`notes/RESUME.md`, written 23 Aug 2026, said of the provenance gate:
+An earlier working note in this repository said of the provenance gate:
 
 > The provenance gate makes injection structurally hard — injected instructions are not
 > present in the source narration and so cannot pass a substring check.
@@ -108,5 +108,5 @@ This note is the long answer. The short one:
 
 ---
 
-*Written 23 Aug 2026, Phase 5 step 3. Supersedes the provenance/injection claim in
-`notes/RESUME.md`.*
+*Supersedes the earlier provenance/injection claim recorded while the gate was being
+built.*
