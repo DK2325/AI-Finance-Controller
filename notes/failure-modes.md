@@ -1035,6 +1035,72 @@ came looking for.
 > shape a number takes when it is about to be trusted, which is exactly when the count
 > underneath it stops being looked at.
 
+### A fourth, and the only one where the test would have certified the defect
+
+The audit trail was wrong on the live path twice inside a week. Neither time did a test
+catch it, and the second time it was found by an audit rather than by the suite.
+
+The INSERT behind a human approval wrote `run_id`, `layer`, `decision` and `approver`.
+`decision` is `escalated` for approve, reject and edit alike, so the verdict was stored
+nowhere; `entity_id` was never written, so the exception was stored nowhere either. An
+approve on one settlement and a reject on another produced two rows differing by timestamp
+and by nothing else. `input_row_hashes` is a column on that table and the payload has
+always populated it, and it was dropped too.
+
+**Why no test caught it, and why writing one is not enough.** The defect lives in the
+branch that runs when Postgres is present. The suite runs without Postgres. So the obvious
+test — record a decision, read it back — exercises the *file fallback*, and the file
+fallback writes the entire payload and always did.
+
+That is the distinguishing property, and it is worse than the three above:
+
+> **The fallback stored more than the healthy path.** A test run without a database would
+> not have failed to catch this. It would have gone green *because* the storage was rich,
+> and its greenness would have been evidence about a path that was never broken.
+
+The three earlier cases were instruments that reported nothing useful — an inert rule, a
+test asserting on the clock, a rate over a zero denominator. This one is an instrument that
+would have reported **the opposite of the truth**, confidently, in the direction of
+reassurance. It joins the provenance rate and the migration that switched off the logger:
+all three produce a reading that looks like the answer someone was hoping for.
+
+**The fix is the test design, more than it is the INSERT.** `tests/test_audit_trail.py`
+reads the SQL statement out of `api/review.py` and asserts over its column list rather than
+executing it. That needs no database, which means it runs on every machine and in every
+job — the only property that would have caught either defect. The round trip that approves
+one row, rejects another and reads both back is kept, and it skips when no database is
+reachable, so it can never be the thing this relies on.
+
+> **A guard that only runs where the defect cannot occur is not a guard.** Ask which branch
+> the defect lives in, then ask whether the test reaches that branch on the machine where
+> it usually runs. If the answer is no, the test is measuring the other path and reporting
+> on this one.
+
+#### The rule found what the list would not have
+
+The assertion was written as an invariant over the payload and the schema rather than as a
+list of the fields that were missing:
+
+> **If a decision carries a value and there is a column for it, it must be written.**
+
+Four fields were known to be missing when it was written. On first run it failed on six: it
+also caught `input_tokens` and `output_tokens`, carried as `0`, with columns waiting for
+them. Nobody had asked for those and nobody had noticed them. They are stored now, at zero,
+because a human gate calls no model and *cost nothing* is a fact about the decision, where
+`NULL` says *not known* — a weaker and different claim.
+
+A test naming the four fields would have passed. It would also have passed the next time a
+fifth was added and forgotten, which is the same defect one field later — and that is
+exactly how this one arrived, since the four dropped fields were themselves added to the
+payload after the INSERT was written and never wired into it.
+
+**The general form, which is not about audit trails.** A test that enumerates today's
+answers can only ever re-detect today's defect. A test that states the rule the answers
+come from detects the next one too, and occasionally tells you something you did not know
+about the code you just wrote. The enumerating version is easier to write, always passes
+first time, and is worth less than it looks — which is the same trade as every other entry
+on this page.
+
 ---
 
 ## The evidence was on the page, and the question decided what could be seen

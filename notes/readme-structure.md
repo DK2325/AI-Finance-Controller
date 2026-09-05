@@ -77,3 +77,37 @@ Not attempted here, written down so the shape is known:
 
 None of these changes a number. All of them change what a reader believes after ninety
 seconds.
+
+---
+
+### Also known and unfixed: static assets have no `Cache-Control`
+
+Not a README problem, recorded here because this is where the known-and-unfixed list
+lives.
+
+`StaticFiles` serves `app.css` and `app.js` with an `etag` and a `last-modified` and **no
+`Cache-Control` header at all**, which leaves a browser free to apply heuristic freshness
+and serve its own copy without revalidating. Across a redeploy that means old assets
+against new HTML.
+
+This is not theoretical and it is not a beginner's mistake. **It happened twice in one day,
+to two people who knew what they were looking at**, and it read as a failed deploy both
+times:
+
+* a hard reload was needed to see CSS that had already shipped, and the page looked
+  unchanged when it was not;
+* a headless browser reusing an earlier profile screenshotted a badge reading `70%` while
+  `curl` of the same asset on the same host returned `toFixed(1)`. The deploy was correct
+  and the instrument was stale — which is the failure mode of the whole
+  `notes/failure-modes.md` document, arriving through a browser cache.
+
+The risk that matters is a reviewer who opens the live site, leaves the tab, and returns
+after a redeploy. They get a mix of old and new, and what they see is not a caching
+artefact to them — it is the product.
+
+**Deliberately not fixed now.** It is a change to the serving path, and the serving path is
+what the demo runs on. The fix is one line in `api/main.py` — a `Cache-Control:
+no-cache` (revalidate every time, still cheap because the `etag` makes it a 304) on the
+`/assets` mount — and it belongs after recording, not before it.
+
+The workaround until then is Ctrl+Shift+R, and knowing to reach for it.
